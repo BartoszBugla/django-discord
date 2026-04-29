@@ -1,0 +1,34 @@
+{% extends 'chat/base.html' %}
+{% block title %}Rejestracja - Django Discord{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-center align-items-center" style="min-height: 100vh;">
+    <div class="card shadow-sm" style="width: 100%; max-width: 420px;">
+        <div class="card-body p-4">
+            <h2 class="text-center mb-4">Utworz konto</h2>
+
+            <form method="post">
+                {% csrf_token %}
+                {% for field in form %}
+                <div class="mb-3">
+                    <label class="form-label">{{ field.label }}</label>
+                    {{ field }}
+                    {% if field.errors %}
+                    <div class="text-danger small mt-1">
+                        {% for error in field.errors %}{{ error }}{% endfor %}
+                    </div>
+                    {% endif %}
+                    {% if field.help_text %}
+                    <div class="form-text">{{ field.help_text }}</div>
+                    {% endif %}
+                </div>
+                {% endfor %}
+                <button type="submit" class="btn btn-primary w-100">Zarejestruj sie</button>
+            </form>
+            <p class="text-center mt-3">
+                Masz juz konto? <a href="{% url 'chat:login' %}">Zaloguj sie</a>
+            </p>
+        </div>
+    </div>
+</div>
+{% endblock %}

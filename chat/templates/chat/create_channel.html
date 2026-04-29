@@ -1,0 +1,33 @@
+{% extends 'chat/base.html' %}
+{% block title %}Nowy kanal - Django Discord{% endblock %}
+
+{% block content %}
+<div class="app-container">
+    {% include 'chat/sidebar.html' %}
+
+    <div class="main-content">
+        <div class="top-bar">
+            <h5><i class="bi bi-plus-circle"></i> Nowy kanal</h5>
+        </div>
+
+        <div class="content-area p-4">
+            <div class="card p-4" style="max-width: 500px; margin: 0 auto;">
+                <h4 class="mb-3">Utworz kanal</h4>
+                <form method="post">
+                    {% csrf_token %}
+                    <div class="mb-3">
+                        <label class="form-label">Nazwa kanalu</label>
+                        <input type="text" name="nazwa" class="form-control" placeholder="np. ogolny" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Opis</label>
+                        <textarea name="opis" class="form-control" rows="2" placeholder="O czym jest ten kanal?"></textarea>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Utworz</button>
+                    <a href="{% url 'chat:home' %}" class="btn btn-secondary ms-2">Anuluj</a>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

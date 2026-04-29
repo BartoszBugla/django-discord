@@ -1,0 +1,49 @@
+{% extends 'chat/base.html' %}
+{% block title %}Strona glowna - Django Discord{% endblock %}
+
+{% block content %}
+<div class="app-container">
+    {% include 'chat/sidebar.html' %}
+
+    <div class="main-content">
+        <div class="top-bar">
+            <h5><i class="bi bi-house-door"></i> Strona glowna</h5>
+            <div class="d-flex align-items-center gap-2">
+                <a href="{% url 'chat:search' %}" class="btn btn-sm btn-outline-secondary">
+                    <i class="bi bi-search"></i> Szukaj
+                </a>
+                <a href="{% url 'chat:profile' user_id=request.user.id %}" class="btn btn-sm btn-outline-secondary">
+                    <i class="bi bi-person"></i> {{ request.user.username }}
+                </a>
+                <a href="{% url 'chat:logout' %}" class="btn btn-sm btn-outline-danger">
+                    <i class="bi bi-box-arrow-right"></i>
+                </a>
+            </div>
+        </div>
+
+        <div class="content-area p-4">
+            <h3>Witaj, {{ request.user.username }}!</h3>
+            <p class="text-muted">Wybierz kanal z listy po lewej lub rozpocznij nowa rozmowe.</p>
+
+            <h5 class="mt-4">Wszystkie kanaly</h5>
+            <div class="row">
+                {% for channel in channels %}
+                <div class="col-md-4 mb-3">
+                    <div class="card">
+                        <div class="card-body">
+                            <h6 class="card-title"><i class="bi bi-hash"></i> {{ channel.nazwa }}</h6>
+                            <p class="card-text text-muted small mb-2">{{ channel.opis|truncatewords:10 }}</p>
+                            <a href="{% url 'chat:channel' channel_id=channel.id %}" class="btn btn-sm btn-primary">
+                                Wejdz
+                            </a>
+                        </div>
+                    </div>
+                </div>
+                {% empty %}
+                <p class="text-muted">Brak kanalow. Utworz pierwszy!</p>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

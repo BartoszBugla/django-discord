@@ -1,0 +1,34 @@
+{% load static %}
+<div class="sidebar">
+    <div class="sidebar-header">
+        <h5>Django Discord</h5>
+    </div>
+
+    <div class="sidebar-section">
+        <div class="sidebar-title">
+            KANALY TEKSTOWE
+            <a href="{% url 'chat:create_channel' %}" class="btn btn-sm text-primary" title="Nowy kanal">+</a>
+        </div>
+        {% for ch in all_channels %}
+        <a href="{% url 'chat:channel' channel_id=ch.id %}" class="sidebar-link">
+            <i class="bi bi-hash"></i> {{ ch.nazwa }}
+        </a>
+        {% endfor %}
+    </div>
+
+    <div class="sidebar-section">
+        <div class="sidebar-title">WIADOMOSCI PRYWATNE</div>
+        <a href="{% url 'chat:dm_list' %}" class="sidebar-link">
+            <i class="bi bi-chat-dots"></i> Lista rozmow
+        </a>
+    </div>
+
+    <div class="sidebar-user">
+        <div class="d-flex align-items-center">
+            <div class="avatar-placeholder-small me-2">
+                {{ request.user.username|first|upper }}
+            </div>
+            <span class="small">{{ request.user.username }}</span>
+        </div>
+    </div>
+</div>

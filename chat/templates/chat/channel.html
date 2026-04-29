@@ -1,0 +1,156 @@
+{% extends 'chat/base.html' %}
+{% block title %}#{{ channel.nazwa }} - Django Discord{% endblock %}
+
+{% block content %}
+<div class="app-container">
+    {% include 'chat/sidebar.html' %}
+
+    <div class="main-content">
+        <div class="top-bar">
+            <h5><i class="bi bi-hash"></i> {{ channel.nazwa }}</h5>
+            <div class="d-flex align-items-center gap-2">
+                <span class="text-muted small">{{ channel.opis }}</span>
+                {% if request.user == channel.tworca or request.user.profile.role == 'admin' %}
+                <form method="post" action="{% url 'chat:delete_channel' channel_id=channel.id %}">
+                    {% csrf_token %}
+                    <button class="btn btn-sm btn-outline-danger" onclick="return confirm('Na pewno usunac kanal?')">
+                        <i class="bi bi-trash"></i>
+                    </button>
+                </form>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="chat-area" id="chat-messages">
+            {% for msg in wiadomosci %}
+            <div class="message-item">
+                <div class="message-header">
+                    <a href="{% url 'chat:profile' user_id=msg.autor.id %}" class="message-author">
+                        {{ msg.autor.username }}
+                    </a>
+                    <span class="message-time">{{ msg.timestamp|date:"d.m.Y H:i" }}</span>
+
+                    {% if request.user == msg.autor or request.user.profile.role in 'admin,moderator' %}
+                    <form method="post" action="{% url 'chat:delete_message' message_id=msg.id %}" class="d-inline">
+                        {% csrf_token %}
+                        <input type="hidden" name="next" value="{% url 'chat:channel' channel_id=channel.id %}">
+                        <button class="btn btn-sm text-danger p-0 ms-2" title="Usun"><i class="bi bi-x"></i></button>
+                    </form>
+                    {% endif %}
+                </div>
+
+                {% if msg.tresc %}
+                <div class="message-text">{{ msg.tresc }}</div>
+                {% endif %}
+                {% if msg.obrazek %}
+                <div class="mt-1"><img src="{{ msg.obrazek.url }}" class="chat-image"></div>
+                {% endif %}
+                {% if msg.audio %}
+                <div class="mt-1"><audio controls src="{{ msg.audio.url }}"></audio></div>
+                {% endif %}
+
+                <div class="reactions">
+                    {% for r in msg.reactions.all %}
+                    <span class="reaction-badge">{{ r.emoji }}</span>
+                    {% endfor %}
+                    <div class="dropdown d-inline">
+                        <button class="btn btn-sm text-muted p-0 ms-1" type="button" data-bs-toggle="dropdown">
+                            <i class="bi bi-emoji-smile"></i>
+                        </button>
+                        <div class="dropdown-menu emoji-picker">
+                            {% for e in emojis %}
+                            <form method="post" action="{% url 'chat:add_reaction' message_id=msg.id %}" class="d-inline">
+                                {% csrf_token %}
+                                <input type="hidden" name="next" value="{% url 'chat:channel' channel_id=channel.id %}">
+                                <button type="submit" name="emoji" value="{{ e }}" class="emoji-btn">{{ e }}</button>
+                            </form>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+
+        <div class="message-input-area">
+            <form method="post" enctype="multipart/form-data" class="d-flex gap-2 align-items-center w-100" id="message-form">
+                {% csrf_token %}
+                <input type="text" name="tresc" class="form-control" id="message-input"
+                       placeholder="Napisz wiadomosc na #{{ channel.nazwa }}..." autocomplete="off">
+                <label class="btn btn-outline-secondary btn-sm" title="Dodaj obrazek">
+                    <i class="bi bi-image"></i>
+                    <input type="file" name="obrazek" accept="image/*" hidden onchange="this.form.submit()">
+                </label>
+                <label class="btn btn-outline-secondary btn-sm" title="Dodaj audio">
+                    <i class="bi bi-mic"></i>
+                    <input type="file" name="audio" accept="audio/*" hidden onchange="this.form.submit()">
+                </label>
+                <button type="submit" class="btn btn-primary btn-sm"><i class="bi bi-send"></i></button>
+            </form>
+        </div>
+    </div>
+
+    <div class="members-sidebar">
+        <h6 class="p-3">Czlonkowie - {{ members.count }}</h6>
+        {% for m in members %}
+        <a href="{% url 'chat:profile' user_id=m.user.id %}" class="member-item">
+            <span class="status-dot {% if m.user.profile.is_online %}online{% else %}offline{% endif %}"></span>
+            {{ m.user.username }}
+        </a>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    const channelId = {{ channel.id }};
+    const wsProtocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
+    const chatSocket = new WebSocket(wsProtocol + '://' + window.location.host + '/ws/chat/' + channelId + '/');
+
+    chatSocket.onmessage = function(e) {
+        const data = JSON.parse(e.data);
+        const chatMessages = document.getElementById('chat-messages');
+        const div = document.createElement('div');
+        div.className = 'message-item';
+        div.innerHTML = '<div class="message-header"><span class="message-author">' + data.username +
+            '</span><span class="message-time">' + data.timestamp + '</span></div>' +
+            '<div class="message-text">' + data.message + '</div>';
+        chatMessages.appendChild(div);
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+    };
+
+    const msgForm = document.getElementById('message-form');
+    const msgInput = document.getElementById('message-input');
+
+    msgForm.addEventListener('submit', function(e) {
+        const fileInputs = msgForm.querySelectorAll('input[type="file"]');
+        let hasFiles = false;
+        fileInputs.forEach(function(f) { if (f.files.length > 0) hasFiles = true; });
+        if (!msgInput.value.trim() && !hasFiles) {
+            e.preventDefault();
+        }
+    });
+
+    msgInput.addEventListener('keypress', function(e) {
+        if (e.key === 'Enter' && msgInput.value.trim() && !e.shiftKey) {
+            const fileInputs = msgForm.querySelectorAll('input[type="file"]');
+            let hasFiles = false;
+            fileInputs.forEach(f => { if (f.files.length > 0) hasFiles = true; });
+
+            if (!hasFiles) {
+                e.preventDefault();
+                const text = msgInput.value.trim();
+                if (text) {
+                    chatSocket.send(JSON.stringify({'message': text}));
+                    msgInput.value = '';
+                }
+            }
+        }
+    });
+
+    // scroll to bottom on load
+    const chatMessages = document.getElementById('chat-messages');
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+</script>
+{% endblock %}

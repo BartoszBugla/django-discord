@@ -1,0 +1,84 @@
+{% extends 'chat/base.html' %}
+{% block title %}{{ viewed_user.username }} - Django Discord{% endblock %}
+
+{% block content %}
+<div class="app-container">
+    {% include 'chat/sidebar.html' %}
+
+    <div class="main-content">
+        <div class="top-bar">
+            <h5><i class="bi bi-person"></i> Profil: {{ viewed_user.username }}</h5>
+        </div>
+
+        <div class="content-area p-4">
+            {% if messages %}
+            {% for msg in messages %}
+            <div class="alert alert-info">{{ msg }}</div>
+            {% endfor %}
+            {% endif %}
+
+            <div class="card p-4 text-center" style="max-width: 500px; margin: 0 auto;">
+                {% if profile.avatar %}
+                <img src="{{ profile.avatar.url }}" class="avatar-large mb-3 mx-auto">
+                {% else %}
+                <div class="avatar-placeholder-large mb-3 mx-auto">
+                    {{ viewed_user.username|first|upper }}
+                </div>
+                {% endif %}
+
+                <h3>{{ viewed_user.username }}</h3>
+                <span class="badge bg-{% if profile.role == 'admin' %}danger{% elif profile.role == 'moderator' %}warning{% else %}secondary{% endif %} mb-2">
+                    {{ profile.get_role_display }}
+                </span>
+                <p class="text-muted">
+                    <span class="status-dot {% if profile.is_online %}online{% else %}offline{% endif %}"></span>
+                    {% if profile.is_online %}Online{% else %}Offline{% endif %}
+                </p>
+
+                {% if profile.opis %}
+                <p>{{ profile.opis }}</p>
+                {% endif %}
+
+                {% if viewed_user == request.user %}
+                <a href="{% url 'chat:edit_profile' %}" class="btn btn-primary btn-sm mt-2">
+                    <i class="bi bi-pencil"></i> Edytuj profil
+                </a>
+                {% else %}
+                <div class="mt-3 d-flex justify-content-center gap-2">
+                    <a href="{% url 'chat:dm' user_id=viewed_user.id %}" class="btn btn-primary btn-sm">
+                        <i class="bi bi-chat"></i> Wyslij wiadomosc
+                    </a>
+
+                    {% if is_blocked %}
+                    <form method="post" action="{% url 'chat:unblock_user' user_id=viewed_user.id %}">
+                        {% csrf_token %}
+                        <button class="btn btn-success btn-sm"><i class="bi bi-unlock"></i> Odblokuj</button>
+                    </form>
+                    {% else %}
+                    <form method="post" action="{% url 'chat:block_user' user_id=viewed_user.id %}">
+                        {% csrf_token %}
+                        <button class="btn btn-danger btn-sm"><i class="bi bi-slash-circle"></i> Zablokuj</button>
+                    </form>
+                    {% endif %}
+                </div>
+
+                {% if request.user.profile.role == 'admin' %}
+                <div class="mt-3">
+                    <h6>Zmien role</h6>
+                    <form method="post" action="{% url 'chat:change_role' user_id=viewed_user.id %}" class="d-inline-flex gap-2">
+                        {% csrf_token %}
+                        <select name="role" class="form-select form-select-sm" style="width: auto;">
+                            <option value="user" {% if profile.role == 'user' %}selected{% endif %}>Uzytkownik</option>
+                            <option value="moderator" {% if profile.role == 'moderator' %}selected{% endif %}>Moderator</option>
+                            <option value="admin" {% if profile.role == 'admin' %}selected{% endif %}>Administrator</option>
+                        </select>
+                        <button class="btn btn-sm btn-warning">Zapisz</button>
+                    </form>
+                </div>
+                {% endif %}
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
