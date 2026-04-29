@@ -5,5 +5,8 @@ from .models import Profile
 
 
 @receiver(post_save, sender=User)
-def create_profile(sender, instance, **kwargs):
-    Profile.objects.get_or_create(user=instance)
+def create_profile(sender, instance, created, **kwargs):
+    profile, was_created = Profile.objects.get_or_create(user=instance)
+    if instance.is_superuser and profile.role != 'admin':
+        profile.role = 'admin'
+        profile.save()

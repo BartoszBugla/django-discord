@@ -1,4 +1,5 @@
 {% extends 'chat/base.html' %}
+{% load chat_extras %}
 {% block title %}#{{ channel.nazwa }} - Django Discord{% endblock %}
 
 {% block content %}
@@ -10,7 +11,11 @@
             <h5><i class="bi bi-hash"></i> {{ channel.nazwa }}</h5>
             <div class="d-flex align-items-center gap-2">
                 <span class="text-muted small">{{ channel.opis }}</span>
-                {% if request.user == channel.tworca or request.user.profile.role == 'admin' %}
+                <a href="{% url 'chat:leave_channel' channel_id=channel.id %}" class="btn btn-sm btn-outline-secondary"
+                   onclick="return confirm('Na pewno opuscic kanal?')">
+                    <i class="bi bi-box-arrow-left"></i> Opusc
+                </a>
+                {% if request.user == channel.tworca or request.user.profile.role == 'admin' or request.user.is_superuser %}
                 <form method="post" action="{% url 'chat:delete_channel' channel_id=channel.id %}">
                     {% csrf_token %}
                     <button class="btn btn-sm btn-outline-danger" onclick="return confirm('Na pewno usunac kanal?')">
@@ -25,16 +30,24 @@
             {% for msg in wiadomosci %}
             <div class="message-item">
                 <div class="message-header">
-                    <a href="{% url 'chat:profile' user_id=msg.autor.id %}" class="message-author">
+                    <a href="{% url 'chat:profile' user_id=msg.autor.id %}"
+                       class="message-author {% if msg.autor.profile.role == 'admin' %}role-admin{% elif msg.autor.profile.role == 'moderator' %}role-moderator{% endif %}">
                         {{ msg.autor.username }}
                     </a>
+                    {% if msg.autor.profile.role == 'admin' %}
+                    <span class="role-tag role-tag-admin">ADMIN</span>
+                    {% elif msg.autor.profile.role == 'moderator' %}
+                    <span class="role-tag role-tag-mod">MOD</span>
+                    {% endif %}
                     <span class="message-time">{{ msg.timestamp|date:"d.m.Y H:i" }}</span>
 
-                    {% if request.user == msg.autor or request.user.profile.role in 'admin,moderator' %}
-                    <form method="post" action="{% url 'chat:delete_message' message_id=msg.id %}" class="d-inline">
+                    {% if request.user == msg.autor or request.user.profile.role == 'admin' or request.user.profile.role == 'moderator' or request.user.is_superuser %}
+                    <form method="post" action="{% url 'chat:delete_message' message_id=msg.id %}" class="d-inline ms-auto">
                         {% csrf_token %}
                         <input type="hidden" name="next" value="{% url 'chat:channel' channel_id=channel.id %}">
-                        <button class="btn btn-sm text-danger p-0 ms-2" title="Usun"><i class="bi bi-x"></i></button>
+                        <button class="btn-delete-msg" title="Usun wiadomosc" onclick="return confirm('Usunac te wiadomosc?')">
+                            <i class="bi bi-trash"></i>
+                        </button>
                     </form>
                     {% endif %}
                 </div>
@@ -50,11 +63,19 @@
                 {% endif %}
 
                 <div class="reactions">
-                    {% for r in msg.reactions.all %}
-                    <span class="reaction-badge">{{ r.emoji }}</span>
+                    {% for r in reactions_map|get_item:msg.id %}
+                    <form method="post" action="{% url 'chat:add_reaction' message_id=msg.id %}" class="d-inline">
+                        {% csrf_token %}
+                        <input type="hidden" name="next" value="{% url 'chat:channel' channel_id=channel.id %}">
+                        <button type="submit" name="emoji" value="{{ r.emoji }}"
+                                class="reaction-badge {% if r.mine %}reaction-mine{% endif %}"
+                                title="{% if r.mine %}Kliknij aby usunac{% else %}Kliknij aby dodac{% endif %}">
+                            {{ r.emoji }} <span class="reaction-count">{{ r.count }}</span>
+                        </button>
+                    </form>
                     {% endfor %}
                     <div class="dropdown d-inline">
-                        <button class="btn btn-sm text-muted p-0 ms-1" type="button" data-bs-toggle="dropdown">
+                        <button class="btn btn-sm text-muted p-0 ms-1" type="button" data-bs-toggle="dropdown" title="Dodaj reakcje">
                             <i class="bi bi-emoji-smile"></i>
                         </button>
                         <div class="dropdown-menu emoji-picker">
@@ -93,9 +114,16 @@
     <div class="members-sidebar">
         <h6 class="p-3">Czlonkowie - {{ members.count }}</h6>
         {% for m in members %}
-        <a href="{% url 'chat:profile' user_id=m.user.id %}" class="member-item">
+        <a href="{% url 'chat:profile' user_id=m.user.id %}" class="member-item d-flex align-items-center">
             <span class="status-dot {% if m.user.profile.is_online %}online{% else %}offline{% endif %}"></span>
-            {{ m.user.username }}
+            <span class="{% if m.user.profile.role == 'admin' %}role-admin{% elif m.user.profile.role == 'moderator' %}role-moderator{% endif %}">
+                {{ m.user.username }}
+            </span>
+            {% if m.user.profile.role == 'admin' %}
+            <span class="role-tag role-tag-admin ms-auto">ADMIN</span>
+            {% elif m.user.profile.role == 'moderator' %}
+            <span class="role-tag role-tag-mod ms-auto">MOD</span>
+            {% endif %}
         </a>
         {% endfor %}
     </div>

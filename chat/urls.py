@@ -14,6 +14,7 @@ urlpatterns = [
     path('kanal/<int:channel_id>/', views.channel_view, name='channel'),
     path('kanal/<int:channel_id>/dolacz/', views.join_channel, name='join_channel'),
     path('kanal/<int:channel_id>/usun/', views.delete_channel, name='delete_channel'),
+    path('kanal/<int:channel_id>/opusc/', views.leave_channel, name='leave_channel'),
     path('dm/', views.dm_list, name='dm_list'),
     path('dm/<int:user_id>/', views.dm_view, name='dm'),
     path('wiadomosc/<int:message_id>/usun/', views.delete_message, name='delete_message'),
@@ -22,4 +23,5 @@ urlpatterns = [
     path('uzytkownik/<int:user_id>/odblokuj/', views.unblock_user, name='unblock_user'),
     path('uzytkownik/<int:user_id>/rola/', views.change_role, name='change_role'),
     path('szukaj/', views.search_view, name='search'),
+    path('panel/', views.admin_users, name='admin_users'),
 ]

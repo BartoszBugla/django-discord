@@ -1,3 +1,11 @@
-staticfiles/
+__pycache__/
+*.py[cod]
+*.so
+
 db.sqlite3
 .env
+
+staticfiles/
+media/
+
+*.log

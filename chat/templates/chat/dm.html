@@ -7,23 +7,43 @@
 
     <div class="main-content">
         <div class="top-bar">
-            <h5><i class="bi bi-chat-dots"></i> {{ other_user.username }}</h5>
+            <h5>
+                <i class="bi bi-chat-dots"></i> {{ other_user.username }}
+                {% if other_user.profile.role == 'admin' %}
+                <span class="role-tag role-tag-admin">ADMIN</span>
+                {% elif other_user.profile.role == 'moderator' %}
+                <span class="role-tag role-tag-mod">MOD</span>
+                {% endif %}
+            </h5>
+            <div class="d-flex align-items-center gap-2">
+                <a href="{% url 'chat:profile' user_id=other_user.id %}" class="btn btn-sm btn-outline-secondary">
+                    <i class="bi bi-person"></i> Profil
+                </a>
+            </div>
         </div>
 
         <div class="chat-area" id="chat-messages">
             {% for msg in wiadomosci %}
             <div class="message-item">
                 <div class="message-header">
-                    <a href="{% url 'chat:profile' user_id=msg.autor.id %}" class="message-author">
+                    <a href="{% url 'chat:profile' user_id=msg.autor.id %}"
+                       class="message-author {% if msg.autor.profile.role == 'admin' %}role-admin{% elif msg.autor.profile.role == 'moderator' %}role-moderator{% endif %}">
                         {{ msg.autor.username }}
                     </a>
+                    {% if msg.autor.profile.role == 'admin' %}
+                    <span class="role-tag role-tag-admin">ADMIN</span>
+                    {% elif msg.autor.profile.role == 'moderator' %}
+                    <span class="role-tag role-tag-mod">MOD</span>
+                    {% endif %}
                     <span class="message-time">{{ msg.timestamp|date:"d.m.Y H:i" }}</span>
 
-                    {% if request.user == msg.autor or request.user.profile.role in 'admin,moderator' %}
-                    <form method="post" action="{% url 'chat:delete_message' message_id=msg.id %}" class="d-inline">
+                    {% if request.user == msg.autor or request.user.profile.role == 'admin' or request.user.profile.role == 'moderator' or request.user.is_superuser %}
+                    <form method="post" action="{% url 'chat:delete_message' message_id=msg.id %}" class="d-inline ms-auto">
                         {% csrf_token %}
                         <input type="hidden" name="next" value="{% url 'chat:dm' user_id=other_user.id %}">
-                        <button class="btn btn-sm text-danger p-0 ms-2" title="Usun"><i class="bi bi-x"></i></button>
+                        <button class="btn-delete-msg" title="Usun wiadomosc" onclick="return confirm('Usunac te wiadomosc?')">
+                            <i class="bi bi-trash"></i>
+                        </button>
                     </form>
                     {% endif %}
                 </div>

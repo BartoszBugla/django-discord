@@ -14,7 +14,9 @@ def register_view(request):
         form = RegisterForm(request.POST)
         if form.is_valid():
             user = form.save()
-            Profile.objects.get_or_create(user=user)
+            profile, _ = Profile.objects.get_or_create(user=user)
+            profile.is_online = True
+            profile.save()
             login(request, user)
             return redirect('chat:home')
     else:
@@ -129,10 +131,24 @@ def channel_view(request, channel_id):
             msg.save()
             return redirect('chat:channel', channel_id=channel.id)
 
-    wiadomosci = Message.objects.filter(channel=channel).select_related('autor')
-    members = ChannelMember.objects.filter(channel=channel).select_related('user')
+    wiadomosci = Message.objects.filter(channel=channel).select_related('autor', 'autor__profile')
+    members = ChannelMember.objects.filter(channel=channel).select_related('user', 'user__profile')
     all_channels = Channel.objects.filter(members__user=request.user)
     emojis = ['👍', '👎', '❤️', '😂', '😮', '😢', '🔥', '🎉']
+
+    all_reactions = Reaction.objects.filter(message__channel=channel)
+    grouped = {}
+    for r in all_reactions:
+        key = (r.message_id, r.emoji)
+        if key not in grouped:
+            grouped[key] = {'emoji': r.emoji, 'count': 0, 'mine': False}
+        grouped[key]['count'] += 1
+        if r.user_id == request.user.id:
+            grouped[key]['mine'] = True
+
+    reactions_map = {}
+    for (msg_id, emoji), data in grouped.items():
+        reactions_map.setdefault(msg_id, []).append(data)
 
     return render(request, 'chat/channel.html', {
         'channel': channel,
@@ -140,6 +156,7 @@ def channel_view(request, channel_id):
         'members': members,
         'all_channels': all_channels,
         'emojis': emojis,
+        'reactions_map': reactions_map,
     })
 
 
@@ -153,10 +170,11 @@ def join_channel(request, channel_id):
 @login_required
 def delete_channel(request, channel_id):
     channel = get_object_or_404(Channel, pk=channel_id)
-    profile, _ = Profile.objects.get_or_create(user=request.user)
-    if request.user == channel.tworca or profile.role == 'admin':
+    if request.user == channel.tworca or _is_admin(request.user):
         channel.delete()
         messages.success(request, 'Kanal usuniety.')
+    else:
+        messages.error(request, 'Brak uprawnien do usuniecia kanalu.')
     return redirect('chat:home')
 
 
@@ -196,7 +214,7 @@ def dm_view(request, user_id):
         Q(autor=request.user, odbiorca=other_user) |
         Q(autor=other_user, odbiorca=request.user),
         channel__isnull=True
-    ).select_related('autor')
+    ).select_related('autor', 'autor__profile')
     all_channels = Channel.objects.filter(members__user=request.user)
 
     return render(request, 'chat/dm.html', {
@@ -207,12 +225,16 @@ def dm_view(request, user_id):
     })
 
 
+def _is_moderator_or_admin(user):
+    profile, _ = Profile.objects.get_or_create(user=user)
+    return profile.role in ('admin', 'moderator') or user.is_superuser
+
+
 @login_required
 def delete_message(request, message_id):
     msg = get_object_or_404(Message, pk=message_id)
-    profile, _ = Profile.objects.get_or_create(user=request.user)
 
-    if request.user == msg.autor or profile.role in ('admin', 'moderator'):
+    if request.user == msg.autor or _is_moderator_or_admin(request.user):
         redirect_url = request.POST.get('next', '/')
         msg.delete()
         messages.success(request, 'Wiadomosc usunieta.')
@@ -251,10 +273,14 @@ def unblock_user(request, user_id):
     return redirect('chat:profile', user_id=user_id)
 
 
+def _is_admin(user):
+    profile, _ = Profile.objects.get_or_create(user=user)
+    return profile.role == 'admin' or user.is_superuser
+
+
 @login_required
 def change_role(request, user_id):
-    profile, _ = Profile.objects.get_or_create(user=request.user)
-    if profile.role != 'admin':
+    if not _is_admin(request.user):
         messages.error(request, 'Brak uprawnien.')
         return redirect('chat:home')
 
@@ -279,6 +305,30 @@ def search_view(request):
     all_channels = Channel.objects.filter(members__user=request.user)
     return render(request, 'chat/search.html', {
         'query': query,
+        'users': users,
+        'channels': channels,
+        'all_channels': all_channels,
+    })
+
+
+@login_required
+def leave_channel(request, channel_id):
+    channel = get_object_or_404(Channel, pk=channel_id)
+    ChannelMember.objects.filter(user=request.user, channel=channel).delete()
+    messages.success(request, f'Opuszczono kanal {channel.nazwa}.')
+    return redirect('chat:home')
+
+
+@login_required
+def admin_users(request):
+    if not _is_admin(request.user):
+        messages.error(request, 'Brak uprawnien.')
+        return redirect('chat:home')
+
+    users = User.objects.select_related('profile').all()
+    channels = Channel.objects.all()
+    all_channels = Channel.objects.filter(members__user=request.user)
+    return render(request, 'chat/admin_users.html', {
         'users': users,
         'channels': channels,
         'all_channels': all_channels,

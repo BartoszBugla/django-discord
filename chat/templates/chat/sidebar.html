@@ -23,12 +23,26 @@
         </a>
     </div>
 
+    {% if request.user.profile.role == 'admin' or request.user.is_superuser %}
+    <div class="sidebar-section">
+        <div class="sidebar-title">ADMINISTRACJA</div>
+        <a href="{% url 'chat:admin_users' %}" class="sidebar-link">
+            <i class="bi bi-shield-lock"></i> Panel admina
+        </a>
+    </div>
+    {% endif %}
+
     <div class="sidebar-user">
         <div class="d-flex align-items-center">
             <div class="avatar-placeholder-small me-2">
                 {{ request.user.username|first|upper }}
             </div>
-            <span class="small">{{ request.user.username }}</span>
+            <div class="d-flex flex-column">
+                <span class="small">{{ request.user.username }}</span>
+                <span class="role-tag-inline {% if request.user.profile.role == 'admin' %}role-tag-admin{% elif request.user.profile.role == 'moderator' %}role-tag-mod{% else %}role-tag-user{% endif %}">
+                    {{ request.user.profile.get_role_display }}
+                </span>
+            </div>
         </div>
     </div>
 </div>

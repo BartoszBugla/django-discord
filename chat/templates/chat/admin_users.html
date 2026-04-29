@@ -1,0 +1,110 @@
+{% extends 'chat/base.html' %}
+{% block title %}Panel administracyjny - Django Discord{% endblock %}
+
+{% block content %}
+<div class="app-container">
+    {% include 'chat/sidebar.html' %}
+
+    <div class="main-content">
+        <div class="top-bar">
+            <h5><i class="bi bi-shield-lock"></i> Panel administracyjny</h5>
+        </div>
+
+        <div class="content-area p-4">
+            {% if messages %}
+            {% for msg in messages %}
+            <div class="alert alert-info">{{ msg }}</div>
+            {% endfor %}
+            {% endif %}
+
+            <h5>Uzytkownicy ({{ users.count }})</h5>
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>Uzytkownik</th>
+                            <th>Email</th>
+                            <th>Rola</th>
+                            <th>Status</th>
+                            <th>Zmien role</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for u in users %}
+                        <tr>
+                            <td>
+                                <a href="{% url 'chat:profile' user_id=u.id %}">{{ u.username }}</a>
+                            </td>
+                            <td>{{ u.email }}</td>
+                            <td>
+                                <span class="badge bg-{% if u.profile.role == 'admin' %}danger{% elif u.profile.role == 'moderator' %}warning{% else %}secondary{% endif %}">
+                                    {{ u.profile.get_role_display }}
+                                </span>
+                            </td>
+                            <td>
+                                <span class="status-dot {% if u.profile.is_online %}online{% else %}offline{% endif %}"></span>
+                                {% if u.profile.is_online %}Online{% else %}Offline{% endif %}
+                            </td>
+                            <td>
+                                {% if u != request.user %}
+                                <form method="post" action="{% url 'chat:change_role' user_id=u.id %}" class="d-inline-flex gap-1">
+                                    {% csrf_token %}
+                                    <select name="role" class="form-select form-select-sm" style="width: auto;">
+                                        <option value="user" {% if u.profile.role == 'user' %}selected{% endif %}>Uzytkownik</option>
+                                        <option value="moderator" {% if u.profile.role == 'moderator' %}selected{% endif %}>Moderator</option>
+                                        <option value="admin" {% if u.profile.role == 'admin' %}selected{% endif %}>Administrator</option>
+                                    </select>
+                                    <button class="btn btn-sm btn-warning">Zapisz</button>
+                                </form>
+                                {% else %}
+                                <span class="text-muted small">Ty</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <h5 class="mt-4">Kanaly ({{ channels.count }})</h5>
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>Nazwa</th>
+                            <th>Opis</th>
+                            <th>Tworca</th>
+                            <th>Czlonkowie</th>
+                            <th>Akcje</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for ch in channels %}
+                        <tr>
+                            <td>
+                                <a href="{% url 'chat:channel' channel_id=ch.id %}">
+                                    <i class="bi bi-hash"></i> {{ ch.nazwa }}
+                                </a>
+                            </td>
+                            <td>{{ ch.opis|truncatewords:8 }}</td>
+                            <td>{{ ch.tworca.username }}</td>
+                            <td>{{ ch.members.count }}</td>
+                            <td>
+                                <form method="post" action="{% url 'chat:delete_channel' channel_id=ch.id %}" class="d-inline">
+                                    {% csrf_token %}
+                                    <button class="btn btn-sm btn-outline-danger" onclick="return confirm('Na pewno usunac kanal {{ ch.nazwa }}?')">
+                                        <i class="bi bi-trash"></i> Usun
+                                    </button>
+                                </form>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr><td colspan="5" class="text-muted">Brak kanalow.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

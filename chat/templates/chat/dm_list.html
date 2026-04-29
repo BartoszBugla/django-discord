@@ -16,6 +16,11 @@
             <a href="{% url 'chat:dm' user_id=u.id %}" class="dm-item d-flex align-items-center p-2">
                 <div class="avatar-placeholder-small me-2">{{ u.username|first|upper }}</div>
                 <span>{{ u.username }}</span>
+                {% if u.profile.role == 'admin' %}
+                <span class="role-tag role-tag-admin ms-1">ADMIN</span>
+                {% elif u.profile.role == 'moderator' %}
+                <span class="role-tag role-tag-mod ms-1">MOD</span>
+                {% endif %}
                 <span class="ms-auto">
                     <span class="status-dot {% if u.profile.is_online %}online{% else %}offline{% endif %}"></span>
                 </span>
@@ -30,6 +35,11 @@
             <a href="{% url 'chat:dm' user_id=u.id %}" class="dm-item d-flex align-items-center p-2">
                 <div class="avatar-placeholder-small me-2">{{ u.username|first|upper }}</div>
                 <span>{{ u.username }}</span>
+                {% if u.profile.role == 'admin' %}
+                <span class="role-tag role-tag-admin ms-1">ADMIN</span>
+                {% elif u.profile.role == 'moderator' %}
+                <span class="role-tag role-tag-mod ms-1">MOD</span>
+                {% endif %}
             </a>
             {% endfor %}
         </div>
