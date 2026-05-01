@@ -32,10 +32,15 @@
 
             <h5 class="mt-3">Kanaly</h5>
             {% for ch in channels %}
-            <a href="{% url 'chat:channel' channel_id=ch.id %}" class="dm-item d-flex align-items-center p-2">
-                <i class="bi bi-hash me-2"></i>
-                <span>{{ ch.nazwa }}</span>
-            </a>
+            <div class="dm-item d-flex align-items-center p-2 flex-wrap gap-2">
+                <a href="{% url 'chat:channel' channel_id=ch.id %}" class="text-decoration-none d-flex align-items-center flex-grow-1 min-w-0">
+                    <i class="bi bi-hash me-2"></i>
+                    <span class="text-truncate">{{ ch.nazwa }}</span>
+                </a>
+                {% if ch.id not in channel_member_ids %}
+                <a href="{% url 'chat:join_channel' channel_id=ch.id %}" class="btn btn-sm btn-outline-primary">Dolacz</a>
+                {% endif %}
+            </div>
             {% empty %}
             <p class="text-muted">Nie znaleziono kanalow.</p>
             {% endfor %}

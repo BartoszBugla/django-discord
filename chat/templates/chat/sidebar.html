@@ -1,48 +1,76 @@
-{% load static %}
-<div class="sidebar">
+<input type="checkbox" id="app-sidebar-drawer" class="app-sidebar-drawer-state" autocomplete="off">
+<label class="app-sidebar-backdrop" for="app-sidebar-drawer" aria-hidden="true"></label>
+<aside class="sidebar app-sidebar-panel" id="app-sidebar" aria-label="Nawigacja">
     <div class="sidebar-header">
-        <h5>Django Discord</h5>
+        <h5 class="mb-0 flex-grow-1 min-w-0">
+            <a href="{% url 'chat:home' %}" class="sidebar-brand-title d-inline-block text-truncate">Django Discord</a>
+        </h5>
+        <label for="app-sidebar-drawer" class="app-sidebar-close-fab" title="Zamknij menu">
+            <span class="visually-hidden">Zamknij menu</span>
+            <i class="bi bi-x-lg" aria-hidden="true"></i>
+        </label>
+    </div>
+
+    <div class="sidebar-section sidebar-quick-nav">
+        <a href="{% url 'chat:home' %}" class="sidebar-link" title="Wyszukiwarka jest na gorze strony">
+            <i class="bi bi-house-door" aria-hidden="true"></i> <span class="sidebar-link-text">Strona glowna</span>
+        </a>
+        <a href="{% url 'chat:notifications_settings' %}" class="sidebar-notifications-link">
+            <i class="bi bi-bell-fill" aria-hidden="true"></i>
+            <span>Powiadomienia</span>
+        </a>
     </div>
 
     <div class="sidebar-section">
         <div class="sidebar-title">
-            KANALY TEKSTOWE
+            <span class="sidebar-title-text">KANALY TEKSTOWE</span>
             <a href="{% url 'chat:create_channel' %}" class="btn btn-sm text-primary" title="Nowy kanal">+</a>
         </div>
         {% for ch in all_channels %}
-        <a href="{% url 'chat:channel' channel_id=ch.id %}" class="sidebar-link">
-            <i class="bi bi-hash"></i> {{ ch.nazwa }}
+        <a href="{% url 'chat:channel' channel_id=ch.id %}" class="sidebar-link" title="{{ ch.nazwa }}">
+            <i class="bi bi-hash" aria-hidden="true"></i> <span class="sidebar-link-text">{{ ch.nazwa }}</span>
         </a>
         {% endfor %}
     </div>
 
     <div class="sidebar-section">
-        <div class="sidebar-title">WIADOMOSCI PRYWATNE</div>
+        <div class="sidebar-title"><span class="sidebar-title-text">WIADOMOSCI PRYWATNE</span></div>
         <a href="{% url 'chat:dm_list' %}" class="sidebar-link">
-            <i class="bi bi-chat-dots"></i> Lista rozmow
+            <i class="bi bi-chat-dots" aria-hidden="true"></i> <span class="sidebar-link-text">Lista rozmow</span>
         </a>
     </div>
 
     {% if request.user.profile.role == 'admin' or request.user.is_superuser %}
     <div class="sidebar-section">
-        <div class="sidebar-title">ADMINISTRACJA</div>
+        <div class="sidebar-title"><span class="sidebar-title-text">ADMINISTRACJA</span></div>
         <a href="{% url 'chat:admin_users' %}" class="sidebar-link">
-            <i class="bi bi-shield-lock"></i> Panel admina
+            <i class="bi bi-shield-lock" aria-hidden="true"></i> <span class="sidebar-link-text">Panel admina</span>
         </a>
     </div>
     {% endif %}
 
     <div class="sidebar-user">
-        <div class="d-flex align-items-center">
+        <a href="{% url 'chat:profile' user_id=request.user.id %}" class="sidebar-user-profile d-flex align-items-center text-decoration-none">
+            {% if request.user.profile.avatar %}
+            <img src="{{ request.user.profile.avatar.url }}" alt="" class="avatar-small me-2 flex-shrink-0">
+            {% else %}
             <div class="avatar-placeholder-small me-2">
                 {{ request.user.username|first|upper }}
             </div>
-            <div class="d-flex flex-column">
-                <span class="small">{{ request.user.username }}</span>
+            {% endif %}
+            <div class="d-flex flex-column min-w-0 sidebar-user-text">
+                <span class="small text-truncate">{{ request.user.username }}</span>
                 <span class="role-tag-inline {% if request.user.profile.role == 'admin' %}role-tag-admin{% elif request.user.profile.role == 'moderator' %}role-tag-mod{% else %}role-tag-user{% endif %}">
                     {{ request.user.profile.get_role_display }}
                 </span>
             </div>
-        </div>
+        </a>
+        <a href="{% url 'chat:logout' %}" class="btn btn-outline-danger btn-sm flex-shrink-0 mt-2 sidebar-logout-btn" title="Wyloguj">
+            <i class="bi bi-box-arrow-right" aria-hidden="true"></i><span class="sidebar-logout-label ms-1">Wyloguj</span>
+        </a>
     </div>
-</div>
+</aside>
+<label class="app-sidebar-open-fab" for="app-sidebar-drawer" title="Menu nawigacji">
+    <span class="visually-hidden">Otworz menu nawigacji</span>
+    <i class="bi bi-list" aria-hidden="true"></i>
+</label>

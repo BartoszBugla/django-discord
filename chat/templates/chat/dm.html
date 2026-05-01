@@ -24,7 +24,7 @@
 
         <div class="chat-area" id="chat-messages">
             {% for msg in wiadomosci %}
-            <div class="message-item">
+            <div class="message-item" id="message-{{ msg.id }}">
                 <div class="message-header">
                     <a href="{% url 'chat:profile' user_id=msg.autor.id %}"
                        class="message-author {% if msg.autor.profile.role == 'admin' %}role-admin{% elif msg.autor.profile.role == 'moderator' %}role-moderator{% endif %}">
@@ -61,11 +61,6 @@
             {% endfor %}
         </div>
 
-        {% if is_blocked %}
-        <div class="message-input-area">
-            <p class="text-muted text-center w-100">Nie mozesz wysylac wiadomosci do tego uzytkownika.</p>
-        </div>
-        {% else %}
         <div class="message-input-area">
             <form method="post" enctype="multipart/form-data" class="d-flex gap-2 align-items-center w-100" id="dm-form">
                 {% csrf_token %}
@@ -82,13 +77,15 @@
                 <button type="submit" class="btn btn-primary btn-sm"><i class="bi bi-send"></i></button>
             </form>
         </div>
-        {% endif %}
     </div>
 </div>
 {% endblock %}
 
 {% block extra_js %}
 <script>
+    window.__chatContext = window.__chatContext || {};
+    window.__chatContext.channelId = null;
+    window.__chatContext.dmUserId = {{ other_user.id }};
     const otherUserId = {{ other_user.id }};
     const wsProtocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
     const dmSocket = new WebSocket(wsProtocol + '://' + window.location.host + '/ws/dm/' + otherUserId + '/');
@@ -98,6 +95,9 @@
         const chatMessages = document.getElementById('chat-messages');
         const div = document.createElement('div');
         div.className = 'message-item';
+        if (data.message_id) {
+            div.id = 'message-' + data.message_id;
+        }
         div.innerHTML = '<div class="message-header"><span class="message-author">' + data.username +
             '</span><span class="message-time">' + data.timestamp + '</span></div>' +
             '<div class="message-text">' + data.message + '</div>';
@@ -138,5 +138,18 @@
 
     const chatMessages = document.getElementById('chat-messages');
     chatMessages.scrollTop = chatMessages.scrollHeight;
+
+    (function () {
+        var m = /^#message-(\d+)$/.exec(location.hash);
+        if (!m) return;
+        var el = document.getElementById('message-' + m[1]);
+        if (el) {
+            el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+            el.classList.add('message-item-highlight');
+            window.setTimeout(function () {
+                el.classList.remove('message-item-highlight');
+            }, 2500);
+        }
+    })();
 </script>
 {% endblock %}

@@ -1,0 +1,112 @@
+{% extends 'chat/base.html' %}
+{% block title %}Powiadomienia - Django Discord{% endblock %}
+
+{% block content %}
+<div class="app-container">
+    {% include 'chat/sidebar.html' %}
+
+    <div class="main-content">
+        <div class="top-bar">
+            <h5><i class="bi bi-bell"></i> Powiadomienia przegladarki</h5>
+        </div>
+
+        <div class="content-area p-4">
+            <div class="notifications-settings-card card shadow-sm border-0 mx-auto" style="max-width: 520px;">
+                <div class="card-body p-4">
+                    <p class="text-muted mb-3">
+                        Gdy masz wlaczone powiadomienia, przegladarka moze pokazac alert o nowej wiadomosci na innym kanale
+                        lub nowym DM, takze gdy karta jest w tle. Dziala to tylko w tej przegladarze i wymaga Twojej zgody.
+                    </p>
+
+                    <div class="d-flex align-items-center flex-wrap gap-2 mb-4">
+                        <span class="text-secondary small text-uppercase fw-semibold">Status</span>
+                        <span id="notify-status-badge" class="badge rounded-pill bg-secondary">Sprawdzanie...</span>
+                    </div>
+
+                    <div class="d-flex flex-wrap gap-2 mb-3">
+                        <button type="button" class="btn btn-primary" id="notify-btn-request">
+                            <i class="bi bi-bell me-1"></i> Popros o zgode
+                        </button>
+                        <button type="button" class="btn btn-outline-primary" id="notify-btn-test" disabled>
+                            Wyslij test
+                        </button>
+                    </div>
+
+                    <p id="notify-hint" class="small text-muted mb-0"></p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function () {
+    var badge = document.getElementById("notify-status-badge");
+    var btnRequest = document.getElementById("notify-btn-request");
+    var btnTest = document.getElementById("notify-btn-test");
+    var hint = document.getElementById("notify-hint");
+
+    function setBadge(text, variant) {
+        badge.textContent = text;
+        badge.className = "badge rounded-pill bg-" + variant;
+    }
+
+    function refreshUi() {
+        if (!("Notification" in window)) {
+            setBadge("Niedostepne", "secondary");
+            btnRequest.disabled = true;
+            btnTest.disabled = true;
+            hint.textContent = "Ta przegladarka nie obsluguje powiadomien systemowych.";
+            return;
+        }
+        var p = Notification.permission;
+        if (p === "granted") {
+            setBadge("Wlaczone", "success");
+            btnRequest.textContent = "Ponow zgode (juz wlaczone)";
+            btnRequest.disabled = false;
+            btnTest.disabled = false;
+            hint.textContent = "Nowe wiadomosci z innych kanalow lub DM pojawia sie jako powiadomienia, gdy nie patrzysz na dana rozmowe.";
+        } else if (p === "denied") {
+            setBadge("Zablokowane", "danger");
+            btnRequest.disabled = true;
+            btnTest.disabled = true;
+            hint.textContent = "Zgoda zostala odrzucona. W Chrome: ikona klodki obok paska adresu > Ustawienia witryny > Powiadomienia.";
+        } else {
+            setBadge("Nie wybrano", "warning");
+            btnRequest.disabled = false;
+            btnTest.disabled = true;
+            hint.textContent = "Kliknij „Popros o zgode”, aby przegladarka wyswietlila okno zgody.";
+        }
+    }
+
+    btnRequest.addEventListener("click", function () {
+        if (!("Notification" in window)) {
+            return;
+        }
+        Notification.requestPermission().then(function () {
+            refreshUi();
+        }).catch(function () {
+            hint.textContent = "Nie udalo sie wyswietlic prosby o zgode.";
+        });
+    });
+
+    btnTest.addEventListener("click", function () {
+        if (!("Notification" in window) || Notification.permission !== "granted") {
+            return;
+        }
+        try {
+            new Notification("Django Discord — test", {
+                body: "Jesli widzisz ten komunikat, powiadomienia dzialaja.",
+                tag: "django-discord-test"
+            });
+        } catch (e) {
+            hint.textContent = "Blad wysylania testu: " + (e && e.message ? e.message : "nieznany");
+        }
+    });
+
+    refreshUi();
+})();
+</script>
+{% endblock %}

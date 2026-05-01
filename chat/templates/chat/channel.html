@@ -26,9 +26,17 @@
             </div>
         </div>
 
+        {% if messages %}
+        <div class="px-3 pt-2">
+            {% for message in messages %}
+            <div class="alert alert-{% if message.tags == 'error' %}danger{% elif message.tags == 'success' %}success{% else %}info{% endif %} py-2 mb-1">{{ message }}</div>
+            {% endfor %}
+        </div>
+        {% endif %}
+
         <div class="chat-area" id="chat-messages">
             {% for msg in wiadomosci %}
-            <div class="message-item">
+            <div class="message-item" id="message-{{ msg.id }}">
                 <div class="message-header">
                     <a href="{% url 'chat:profile' user_id=msg.autor.id %}"
                        class="message-author {% if msg.autor.profile.role == 'admin' %}role-admin{% elif msg.autor.profile.role == 'moderator' %}role-moderator{% endif %}">
@@ -112,10 +120,29 @@
     </div>
 
     <div class="members-sidebar">
-        <h6 class="p-3">Czlonkowie - {{ members.count }}</h6>
+        <h6 class="p-3 mb-0">Czlonkowie - {{ members.count }}</h6>
+        {% if can_add_members %}
+            {% if addable_users %}
+            <form method="post" action="{% url 'chat:add_channel_member' channel_id=channel.id %}" class="px-3 pb-3 border-bottom">
+                {% csrf_token %}
+                <label class="form-label small text-muted mb-1">Dodaj uzytkownika</label>
+                <div class="input-group input-group-sm">
+                    <select name="user_id" class="form-select form-select-sm" required>
+                        <option value="" disabled selected>-- wybierz --</option>
+                        {% for u in addable_users %}
+                        <option value="{{ u.id }}">{{ u.username }}</option>
+                        {% endfor %}
+                    </select>
+                    <button type="submit" class="btn btn-outline-primary btn-sm">Dodaj</button>
+                </div>
+            </form>
+            {% else %}
+            <p class="small text-muted px-3 pb-3 border-bottom mb-0">Wszyscy uzytkownicy sa juz na tym kanale.</p>
+            {% endif %}
+        {% endif %}
         {% for m in members %}
         <a href="{% url 'chat:profile' user_id=m.user.id %}" class="member-item d-flex align-items-center">
-            <span class="status-dot {% if m.user.profile.is_online %}online{% else %}offline{% endif %}"></span>
+            <span class="status-dot {% if m.user.profile.appears_online %}online{% else %}offline{% endif %}"></span>
             <span class="{% if m.user.profile.role == 'admin' %}role-admin{% elif m.user.profile.role == 'moderator' %}role-moderator{% endif %}">
                 {{ m.user.username }}
             </span>
@@ -132,6 +159,9 @@
 
 {% block extra_js %}
 <script>
+    window.__chatContext = window.__chatContext || {};
+    window.__chatContext.channelId = {{ channel.id }};
+    window.__chatContext.dmUserId = null;
     const channelId = {{ channel.id }};
     const wsProtocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
     const chatSocket = new WebSocket(wsProtocol + '://' + window.location.host + '/ws/chat/' + channelId + '/');
@@ -141,6 +171,9 @@
         const chatMessages = document.getElementById('chat-messages');
         const div = document.createElement('div');
         div.className = 'message-item';
+        if (data.message_id) {
+            div.id = 'message-' + data.message_id;
+        }
         div.innerHTML = '<div class="message-header"><span class="message-author">' + data.username +
             '</span><span class="message-time">' + data.timestamp + '</span></div>' +
             '<div class="message-text">' + data.message + '</div>';
@@ -180,5 +213,18 @@
     // scroll to bottom on load
     const chatMessages = document.getElementById('chat-messages');
     chatMessages.scrollTop = chatMessages.scrollHeight;
+
+    (function () {
+        var m = /^#message-(\d+)$/.exec(location.hash);
+        if (!m) return;
+        var el = document.getElementById('message-' + m[1]);
+        if (el) {
+            el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+            el.classList.add('message-item-highlight');
+            window.setTimeout(function () {
+                el.classList.remove('message-item-highlight');
+            }, 2500);
+        }
+    })();
 </script>
 {% endblock %}

@@ -22,7 +22,7 @@
                 <span class="role-tag role-tag-mod ms-1">MOD</span>
                 {% endif %}
                 <span class="ms-auto">
-                    <span class="status-dot {% if u.profile.is_online %}online{% else %}offline{% endif %}"></span>
+                    <span class="status-dot {% if u.profile.appears_online %}online{% else %}offline{% endif %}"></span>
                 </span>
             </a>
             {% empty %}

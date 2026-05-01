@@ -1,0 +1,20 @@
+{% extends 'chat/base.html' %}
+{% block title %}Konto niedostepne{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-center align-items-center px-3" style="min-height: 100vh;">
+    <div class="card shadow-sm border-0 text-center p-4" style="max-width: 420px;">
+        <div class="mb-3 text-warning">
+            <i class="bi bi-lock-fill display-4"></i>
+        </div>
+        <h1 class="h4 mb-3">Konto zablokowane przez administratora</h1>
+        <p class="text-muted mb-4">
+            Twoje konto zostalo wylaczone — nie masz dostepu do zadnych funkcji aplikacji.
+            Jesli to pomylka, skontaktuj sie z administratorem.
+        </p>
+        <a href="{% url 'chat:logout' %}" class="btn btn-primary w-100">
+            <i class="bi bi-box-arrow-right me-1"></i> Wyloguj
+        </a>
+    </div>
+</div>
+{% endblock %}

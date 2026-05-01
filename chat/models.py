@@ -1,5 +1,10 @@
+from datetime import timedelta
+
 from django.db import models
 from django.contrib.auth.models import User
+from django.utils import timezone
+
+HEARTBEAT_ONLINE_SECONDS = 30
 
 
 ROLE_CHOICES = [
@@ -15,9 +20,19 @@ class Profile(models.Model):
     opis = models.TextField(blank=True, default="")
     role = models.CharField(max_length=20, choices=ROLE_CHOICES, default="user")
     is_online = models.BooleanField(default=False)
+    last_seen_at = models.DateTimeField(null=True, blank=True)
 
     def __str__(self):
         return f"{self.user.username} ({self.get_role_display()})"
+
+    @property
+    def appears_online(self):
+        """True if the browser sent a presence ping within HEARTBEAT_ONLINE_SECONDS."""
+        if self.last_seen_at is None:
+            return False
+        return timezone.now() - self.last_seen_at <= timedelta(
+            seconds=HEARTBEAT_ONLINE_SECONDS
+        )
 
 
 class Channel(models.Model):
@@ -74,22 +89,6 @@ class Message(models.Model):
         if self.channel:
             return f"{self.autor.username} w {self.channel.nazwa}: {self.tresc[:30]}"
         return f"{self.autor.username} -> {self.odbiorca.username}: {self.tresc[:30]}"
-
-
-class BlockedUser(models.Model):
-    blokujacy = models.ForeignKey(
-        User, on_delete=models.CASCADE, related_name="blocked_users"
-    )
-    zablokowany = models.ForeignKey(
-        User, on_delete=models.CASCADE, related_name="blocked_by"
-    )
-    data = models.DateTimeField(auto_now_add=True)
-
-    class Meta:
-        unique_together = ("blokujacy", "zablokowany")
-
-    def __str__(self):
-        return f"{self.blokujacy.username} zablokowal {self.zablokowany.username}"
 
 
 class Reaction(models.Model):

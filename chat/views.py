@@ -1,11 +1,14 @@
-from django.shortcuts import render, redirect, get_object_or_404
-from django.contrib.auth import login, logout, authenticate
+from django.contrib import messages
+from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import User
-from django.contrib import messages
+from django.db import IntegrityError
 from django.db.models import Q
+from django.http import JsonResponse
+from django.shortcuts import get_object_or_404, redirect, render
+from django.utils import timezone
 
-from .models import Profile, Channel, ChannelMember, Message, BlockedUser, Reaction
+from .models import Profile, Channel, ChannelMember, Message, Reaction
 from .forms import RegisterForm, ProfileForm, ChannelForm, MessageForm
 
 
@@ -13,12 +16,20 @@ def register_view(request):
     if request.method == 'POST':
         form = RegisterForm(request.POST)
         if form.is_valid():
-            user = form.save()
-            profile, _ = Profile.objects.get_or_create(user=user)
-            profile.is_online = True
-            profile.save()
-            login(request, user)
-            return redirect('chat:home')
+            try:
+                user = form.save()
+            except IntegrityError:
+                form.add_error(
+                    "email",
+                    "Ten adres email jest juz zarejestrowany.",
+                )
+            else:
+                profile, _ = Profile.objects.get_or_create(user=user)
+                profile.is_online = True
+                profile.last_seen_at = timezone.now()
+                profile.save(update_fields=["is_online", "last_seen_at"])
+                login(request, user)
+                return redirect('chat:home')
     else:
         form = RegisterForm()
     return render(request, 'chat/register.html', {'form': form})
@@ -26,16 +37,33 @@ def register_view(request):
 
 def login_view(request):
     if request.method == 'POST':
-        username = request.POST.get('username')
-        password = request.POST.get('password')
+        username = (request.POST.get('username') or '').strip()
+        password = request.POST.get('password') or ''
         user = authenticate(request, username=username, password=password)
         if user is not None:
+            if not user.is_active:
+                messages.error(
+                    request,
+                    'To konto zostalo zablokowane przez administratora. Logowanie jest niemozliwe.',
+                )
+                return render(request, 'chat/login.html')
             login(request, user)
             profile, _ = Profile.objects.get_or_create(user=user)
             profile.is_online = True
-            profile.save()
+            profile.last_seen_at = timezone.now()
+            profile.save(update_fields=["is_online", "last_seen_at"])
             next_url = request.POST.get('next', request.GET.get('next', '/'))
             return redirect(next_url)
+        inactive = User.objects.filter(username=username).first()
+        if (
+            inactive is not None
+            and not inactive.is_active
+            and inactive.check_password(password)
+        ):
+            messages.error(
+                request,
+                'To konto zostalo zablokowane przez administratora. Logowanie jest niemozliwe.',
+            )
         else:
             messages.error(request, 'Nieprawidlowy login lub haslo.')
     return render(request, 'chat/login.html')
@@ -43,10 +71,11 @@ def login_view(request):
 
 @login_required
 def logout_view(request):
-    profile = getattr(request.user, 'profile', None)
+    profile = getattr(request.user, "profile", None)
     if profile:
         profile.is_online = False
-        profile.save()
+        profile.last_seen_at = None
+        profile.save(update_fields=["is_online", "last_seen_at"])
     logout(request)
     return redirect('chat:login')
 
@@ -65,14 +94,10 @@ def home(request):
 def profile_view(request, user_id):
     viewed_user = get_object_or_404(User, pk=user_id)
     profile, _ = Profile.objects.get_or_create(user=viewed_user)
-    is_blocked = BlockedUser.objects.filter(
-        blokujacy=request.user, zablokowany=viewed_user
-    ).exists()
     all_channels = Channel.objects.filter(members__user=request.user)
     return render(request, 'chat/profile.html', {
         'viewed_user': viewed_user,
         'profile': profile,
-        'is_blocked': is_blocked,
         'all_channels': all_channels,
     })
 
@@ -129,6 +154,9 @@ def channel_view(request, channel_id):
             msg.autor = request.user
             msg.channel = channel
             msg.save()
+            from chat.inbox_notify import notify_channel_message_saved
+
+            notify_channel_message_saved(msg)
             return redirect('chat:channel', channel_id=channel.id)
 
     wiadomosci = Message.objects.filter(channel=channel).select_related('autor', 'autor__profile')
@@ -150,6 +178,16 @@ def channel_view(request, channel_id):
     for (msg_id, emoji), data in grouped.items():
         reactions_map.setdefault(msg_id, []).append(data)
 
+    member_ids = ChannelMember.objects.filter(channel=channel).values_list(
+        "user_id", flat=True
+    )
+    addable_users = (
+        User.objects.exclude(pk__in=member_ids)
+        .select_related("profile")
+        .order_by("username")
+    )
+    can_add_members = request.user == channel.tworca or _is_admin(request.user)
+
     return render(request, 'chat/channel.html', {
         'channel': channel,
         'wiadomosci': wiadomosci,
@@ -157,6 +195,8 @@ def channel_view(request, channel_id):
         'all_channels': all_channels,
         'emojis': emojis,
         'reactions_map': reactions_map,
+        'addable_users': addable_users,
+        'can_add_members': can_add_members,
     })
 
 
@@ -164,6 +204,35 @@ def channel_view(request, channel_id):
 def join_channel(request, channel_id):
     channel = get_object_or_404(Channel, pk=channel_id)
     ChannelMember.objects.get_or_create(user=request.user, channel=channel)
+    return redirect('chat:channel', channel_id=channel.id)
+
+
+@login_required
+def add_channel_member(request, channel_id):
+    channel = get_object_or_404(Channel, pk=channel_id)
+    if not ChannelMember.objects.filter(user=request.user, channel=channel).exists():
+        messages.error(request, 'Brak dostepu do kanalu.')
+        return redirect('chat:home')
+    if request.user != channel.tworca and not _is_admin(request.user):
+        messages.error(request, 'Brak uprawnien do dodawania czlonkow.')
+        return redirect('chat:channel', channel_id=channel.id)
+
+    raw_id = request.POST.get('user_id', '').strip()
+    if not raw_id:
+        messages.error(request, 'Wybierz uzytkownika.')
+        return redirect('chat:channel', channel_id=channel.id)
+    try:
+        target = User.objects.get(pk=int(raw_id))
+    except (ValueError, User.DoesNotExist):
+        messages.error(request, 'Nieprawidlowy uzytkownik.')
+        return redirect('chat:channel', channel_id=channel.id)
+
+    if ChannelMember.objects.filter(user=target, channel=channel).exists():
+        messages.info(request, 'Ten uzytkownik jest juz na tym kanale.')
+        return redirect('chat:channel', channel_id=channel.id)
+
+    ChannelMember.objects.create(user=target, channel=channel)
+    messages.success(request, f'Dodano {target.username} do kanalu.')
     return redirect('chat:channel', channel_id=channel.id)
 
 
@@ -197,17 +266,16 @@ def dm_list(request):
 def dm_view(request, user_id):
     other_user = get_object_or_404(User, pk=user_id)
 
-    is_blocked = BlockedUser.objects.filter(
-        blokujacy=other_user, zablokowany=request.user
-    ).exists()
-
-    if request.method == 'POST' and not is_blocked:
+    if request.method == 'POST':
         form = MessageForm(request.POST, request.FILES)
         if form.is_valid():
             msg = form.save(commit=False)
             msg.autor = request.user
             msg.odbiorca = other_user
             msg.save()
+            from chat.inbox_notify import notify_dm_message_saved
+
+            notify_dm_message_saved(msg)
             return redirect('chat:dm', user_id=other_user.id)
 
     wiadomosci = Message.objects.filter(
@@ -221,7 +289,6 @@ def dm_view(request, user_id):
         'other_user': other_user,
         'wiadomosci': wiadomosci,
         'all_channels': all_channels,
-        'is_blocked': is_blocked,
     })
 
 
@@ -256,23 +323,6 @@ def add_reaction(request, message_id):
     return redirect(next_url)
 
 
-@login_required
-def block_user(request, user_id):
-    target = get_object_or_404(User, pk=user_id)
-    if request.user != target:
-        BlockedUser.objects.get_or_create(blokujacy=request.user, zablokowany=target)
-        messages.success(request, f'Uzytkownik {target.username} zablokowany.')
-    return redirect('chat:profile', user_id=user_id)
-
-
-@login_required
-def unblock_user(request, user_id):
-    target = get_object_or_404(User, pk=user_id)
-    BlockedUser.objects.filter(blokujacy=request.user, zablokowany=target).delete()
-    messages.success(request, f'Uzytkownik {target.username} odblokowany.')
-    return redirect('chat:profile', user_id=user_id)
-
-
 def _is_admin(user):
     profile, _ = Profile.objects.get_or_create(user=user)
     return profile.role == 'admin' or user.is_superuser
@@ -295,20 +345,64 @@ def change_role(request, user_id):
 
 
 @login_required
+def notifications_settings(request):
+    all_channels = Channel.objects.filter(members__user=request.user)
+    return render(request, 'chat/notifications_settings.html', {
+        'all_channels': all_channels,
+    })
+
+
+@login_required
 def search_view(request):
-    query = request.GET.get('q', '')
+    query = (request.GET.get('q') or '').strip()
     users = User.objects.none()
     channels = Channel.objects.none()
     if query:
-        users = User.objects.filter(username__icontains=query)
-        channels = Channel.objects.filter(nazwa__icontains=query)
+        users = (
+            User.objects.filter(
+                Q(username__icontains=query) | Q(email__icontains=query)
+            )
+            .exclude(pk=request.user.pk)
+            .order_by('username')[:50]
+        )
+        channels = Channel.objects.filter(nazwa__icontains=query).order_by('nazwa')[:50]
+    member_ids = set(
+        ChannelMember.objects.filter(user=request.user).values_list('channel_id', flat=True)
+    )
     all_channels = Channel.objects.filter(members__user=request.user)
     return render(request, 'chat/search.html', {
         'query': query,
         'users': users,
         'channels': channels,
+        'channel_member_ids': member_ids,
         'all_channels': all_channels,
     })
+
+
+@login_required
+def search_api(request):
+    q = (request.GET.get('q') or '').strip()
+    if len(q) < 1:
+        return JsonResponse({'users': [], 'channels': []})
+    users = list(
+        User.objects.filter(
+            Q(username__icontains=q) | Q(email__icontains=q)
+        )
+        .exclude(pk=request.user.pk)
+        .values('id', 'username')
+        .order_by('username')[:12]
+    )
+    member_ids = set(
+        ChannelMember.objects.filter(user=request.user).values_list('channel_id', flat=True)
+    )
+    channels = []
+    for ch in Channel.objects.filter(nazwa__icontains=q).order_by('nazwa')[:12]:
+        channels.append({
+            'id': ch.id,
+            'nazwa': ch.nazwa,
+            'is_member': ch.id in member_ids,
+        })
+    return JsonResponse({'users': users, 'channels': channels})
 
 
 @login_required
@@ -317,6 +411,45 @@ def leave_channel(request, channel_id):
     ChannelMember.objects.filter(user=request.user, channel=channel).delete()
     messages.success(request, f'Opuszczono kanal {channel.nazwa}.')
     return redirect('chat:home')
+
+
+@login_required
+def presence_status(request, user_id):
+    get_object_or_404(User, pk=user_id)
+    profile, _ = Profile.objects.get_or_create(user_id=user_id)
+    return JsonResponse({"appears_online": profile.appears_online})
+
+
+@login_required
+def admin_toggle_user_active(request, user_id):
+    """Wlacza / wylacza konto (User.is_active) — blokada na poziomie calej aplikacji."""
+    if request.method != 'POST':
+        return redirect('chat:admin_users')
+    if not _is_admin(request.user):
+        messages.error(request, 'Brak uprawnien.')
+        return redirect('chat:home')
+    if user_id == request.user.id:
+        messages.error(request, 'Nie mozesz wylaczyc wlasnego konta w ten sposob.')
+        return redirect('chat:admin_users')
+    target = get_object_or_404(User, pk=user_id)
+    if target.is_superuser and not request.user.is_superuser:
+        messages.error(request, 'Brak uprawnien do zmiany tego konta.')
+        return redirect('chat:admin_users')
+    action = (request.POST.get('action') or '').strip()
+    if action == 'deactivate':
+        target.is_active = False
+        target.save(update_fields=['is_active'])
+        messages.success(
+            request,
+            f'Konto {target.username} zostalo zablokowane — uzytkownik nie moze sie zalogowac.',
+        )
+    elif action == 'activate':
+        target.is_active = True
+        target.save(update_fields=['is_active'])
+        messages.success(request, f'Konto {target.username} zostalo odblokowane.')
+    else:
+        messages.error(request, 'Nieprawidlowa akcja.')
+    return redirect('chat:admin_users')
 
 
 @login_required

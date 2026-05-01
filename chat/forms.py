@@ -16,6 +16,14 @@ class RegisterForm(UserCreationForm):
         for field in self.fields.values():
             field.widget.attrs["class"] = "form-control"
 
+    def clean_email(self):
+        email = (self.cleaned_data.get("email") or "").strip().lower()
+        if not email:
+            raise forms.ValidationError("Podaj adres email.")
+        if User.objects.filter(email__iexact=email).exists():
+            raise forms.ValidationError("Ten adres email jest juz zarejestrowany.")
+        return email
+
 
 class ProfileForm(forms.ModelForm):
     class Meta:

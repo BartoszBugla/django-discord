@@ -21,7 +21,8 @@
                 {% endif %}
                 <div class="mb-3">
                     <label class="form-label">Login</label>
-                    <input type="text" name="username" class="form-control" required>
+                    <input type="text" name="username" class="form-control" required
+                           value="{{ request.POST.username|default:'' }}">
                 </div>
                 <div class="mb-3">
                     <label class="form-label">Haslo</label>

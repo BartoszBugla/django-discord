@@ -26,6 +26,7 @@
                             <th>Email</th>
                             <th>Rola</th>
                             <th>Status</th>
+                            <th>Konto</th>
                             <th>Zmien role</th>
                         </tr>
                     </thead>
@@ -42,8 +43,29 @@
                                 </span>
                             </td>
                             <td>
-                                <span class="status-dot {% if u.profile.is_online %}online{% else %}offline{% endif %}"></span>
-                                {% if u.profile.is_online %}Online{% else %}Offline{% endif %}
+                                <span class="status-dot {% if u.profile.appears_online %}online{% else %}offline{% endif %}"></span>
+                                {% if u.profile.appears_online %}Online{% else %}Offline{% endif %}
+                            </td>
+                            <td>
+                                {% if u.is_active %}
+                                <span class="badge bg-success">Aktywne</span>
+                                {% else %}
+                                <span class="badge bg-danger">Zablokowane</span>
+                                {% endif %}
+                                {% if u != request.user %}
+                                    {% if not u.is_superuser or request.user.is_superuser %}
+                                    <form method="post" action="{% url 'chat:admin_toggle_user_active' user_id=u.id %}" class="d-inline ms-1">
+                                        {% csrf_token %}
+                                        {% if u.is_active %}
+                                        <input type="hidden" name="action" value="deactivate">
+                                        <button type="submit" class="btn btn-sm btn-outline-danger" onclick="return confirm('Zablokowac to konto? Uzytkownik straci dostep do aplikacji.')">Zablokuj</button>
+                                        {% else %}
+                                        <input type="hidden" name="action" value="activate">
+                                        <button type="submit" class="btn btn-sm btn-outline-success">Odblokuj</button>
+                                        {% endif %}
+                                    </form>
+                                    {% endif %}
+                                {% endif %}
                             </td>
                             <td>
                                 {% if u != request.user %}
