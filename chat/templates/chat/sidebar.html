@@ -15,9 +15,9 @@
         <a href="{% url 'chat:home' %}" class="sidebar-link" title="Wyszukiwarka jest u góry strony">
             <i class="bi bi-house-door" aria-hidden="true"></i> <span class="sidebar-link-text">Strona główna</span>
         </a>
-        <a href="{% url 'chat:notifications_settings' %}" class="sidebar-notifications-link">
+        <a href="{% url 'chat:notifications_settings' %}" class="sidebar-notifications-link" title="Powiadomienia w aplikacji (WebSocket)">
             <i class="bi bi-bell-fill" aria-hidden="true"></i>
-            <span>Powiadomienia</span>
+            <span>Powiadomienia w aplikacji</span>
         </a>
     </div>
 
@@ -40,11 +40,12 @@
         </a>
     </div>
 
-    {% if request.user.profile.role == 'admin' or request.user.is_superuser %}
+    {% if request.user.profile.role == 'admin' or request.user.profile.role == 'moderator' or request.user.is_superuser %}
     <div class="sidebar-section">
         <div class="sidebar-title"><span class="sidebar-title-text">Administracja</span></div>
         <a href="{% url 'chat:admin_users' %}" class="sidebar-link">
-            <i class="bi bi-shield-lock" aria-hidden="true"></i> <span class="sidebar-link-text">Panel administratora</span>
+            <i class="bi bi-shield-lock" aria-hidden="true"></i>
+            <span class="sidebar-link-text">{% if request.user.is_superuser or request.user.profile.role == 'admin' %}Panel administratora{% else %}Panel moderacji{% endif %}</span>
         </a>
     </div>
     {% endif %}

@@ -7,6 +7,7 @@ from django.db.models import Q
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
+from django.utils.http import url_has_allowed_host_and_scheme
 
 from .models import Profile, Channel, ChannelMember, Message, Reaction
 from .forms import RegisterForm, ProfileForm, ChannelForm, MessageForm
@@ -110,10 +111,12 @@ def profile_view(request, user_id):
     viewed_user = get_object_or_404(User, pk=user_id)
     profile, _ = Profile.objects.get_or_create(user=viewed_user)
     all_channels = Channel.objects.filter(members__user=request.user)
+    can_toggle_active = _may_toggle_user_active(request.user, viewed_user)
     return render(request, 'chat/profile.html', {
         'viewed_user': viewed_user,
         'profile': profile,
         'all_channels': all_channels,
+        'can_toggle_active': can_toggle_active,
     })
 
 
@@ -347,6 +350,46 @@ def _is_admin(user):
     return profile.role == 'admin' or user.is_superuser
 
 
+def _is_moderator_not_admin(user):
+    """Moderator (profil), bez uprawnień administratora aplikacji."""
+    if user.is_superuser:
+        return False
+    profile, _ = Profile.objects.get_or_create(user=user)
+    return profile.role == 'moderator'
+
+
+def _may_toggle_user_active(actor, target):
+    """
+    Kto może zmienić User.is_active (blokada konta).
+    Administrator: każdy poza sobą; superużytkownik tylko dla superusera-aktora.
+    Moderator: tylko konta z rolą profilu „user”.
+    """
+    if actor.pk == target.pk:
+        return False
+    if target.is_superuser and not actor.is_superuser:
+        return False
+    if _is_admin(actor):
+        return True
+    if _is_moderator_not_admin(actor):
+        tp, _ = Profile.objects.get_or_create(user=target)
+        return tp.role == 'user'
+    return False
+
+
+def _redirect_after_account_toggle(request):
+    """Bezpieczny redirect po POST next= (profil vs panel)."""
+    nxt = (request.POST.get('next') or '').strip()
+    if nxt.startswith('/') and not nxt.startswith('//') and len(nxt) < 512:
+        host = request.get_host()
+        if host and url_has_allowed_host_and_scheme(
+            url=nxt,
+            allowed_hosts={host},
+            require_https=request.is_secure(),
+        ):
+            return redirect(nxt)
+    return redirect('chat:admin_users')
+
+
 @login_required
 def change_role(request, user_id):
     if not _is_admin(request.user):
@@ -444,19 +487,22 @@ def presence_status(request, user_id):
 
 @login_required
 def admin_toggle_user_active(request, user_id):
-    """Wlacza / wylacza konto (User.is_active) — blokada na poziomie calej aplikacji."""
+    """Włącza / wyłącza konto (User.is_active). Admin: wszyscy (wg reguł). Moderator: tylko rola „Użytkownik”."""
     if request.method != 'POST':
         return redirect('chat:admin_users')
-    if not _is_admin(request.user):
+    if not _is_moderator_or_admin(request.user):
         messages.error(request, "Brak uprawnień.")
         return redirect('chat:home')
     if user_id == request.user.id:
         messages.error(request, "Nie możesz wyłączyć własnego konta w ten sposób.")
-        return redirect('chat:admin_users')
+        return _redirect_after_account_toggle(request)
     target = get_object_or_404(User, pk=user_id)
-    if target.is_superuser and not request.user.is_superuser:
-        messages.error(request, "Brak uprawnień do zmiany tego konta.")
-        return redirect('chat:admin_users')
+    if not _may_toggle_user_active(request.user, target):
+        messages.error(
+            request,
+            "Nie masz uprawnień do zablokowania lub odblokowania tego konta.",
+        )
+        return _redirect_after_account_toggle(request)
     action = (request.POST.get('action') or '').strip()
     if action == 'deactivate':
         target.is_active = False
@@ -471,22 +517,27 @@ def admin_toggle_user_active(request, user_id):
         messages.success(request, f"Konto „{target.username}” zostało odblokowane.")
     else:
         messages.error(request, "Nieprawidłowa akcja.")
-    return redirect('chat:admin_users')
+    return _redirect_after_account_toggle(request)
 
 
 @login_required
 def admin_users(request):
-    if not _is_admin(request.user):
+    if not _is_moderator_or_admin(request.user):
         messages.error(request, "Brak uprawnień.")
         return redirect('chat:home')
 
-    users = User.objects.select_related('profile').all()
-    channels = Channel.objects.all()
+    users = list(User.objects.select_related('profile').all())
+    toggle_allowed_ids = {
+        u.id for u in users if _may_toggle_user_active(request.user, u)
+    }
+    channels = Channel.objects.all() if _is_admin(request.user) else Channel.objects.none()
     all_channels = Channel.objects.filter(members__user=request.user)
     return render(request, 'chat/admin_users.html', {
         'users': users,
         'channels': channels,
         'all_channels': all_channels,
+        'is_full_admin': _is_admin(request.user),
+        'toggle_allowed_ids': toggle_allowed_ids,
     })
 
 

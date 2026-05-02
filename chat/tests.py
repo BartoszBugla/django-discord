@@ -20,7 +20,7 @@ class NotificationsSettingsTests(TestCase):
         self.client.login(username="n1", password="x")
         r = self.client.get(reverse("chat:notifications_settings"))
         self.assertEqual(r.status_code, 200)
-        self.assertContains(r, "Powiadomienia")
+        self.assertContains(r, "Powiadomienia w aplikacji")
 
 
 class AccountSuspendedMiddlewareTests(TestCase):
@@ -76,6 +76,67 @@ class AdminAccountBlockTests(TestCase):
         self.assertEqual(r.status_code, 302)
         self.victim.refresh_from_db()
         self.assertFalse(self.victim.is_active)
+
+
+class ModeratorBlockTests(TestCase):
+    def setUp(self):
+        self.client = Client()
+        self.mod = User.objects.create_user(username="modu", password="modpw")
+        self.mod.profile.role = "moderator"
+        self.mod.profile.save()
+        self.admin = User.objects.create_user(username="adm2", password="admpw")
+        self.admin.profile.role = "admin"
+        self.admin.profile.save()
+        self.regular = User.objects.create_user(username="regu", password="regpw")
+        self.other_mod = User.objects.create_user(username="omod", password="ompw")
+        self.other_mod.profile.role = "moderator"
+        self.other_mod.profile.save()
+
+    def test_moderator_can_deactivate_regular_user(self):
+        self.client.login(username="modu", password="modpw")
+        r = self.client.post(
+            reverse("chat:admin_toggle_user_active", args=[self.regular.pk]),
+            {"action": "deactivate", "next": reverse("chat:admin_users")},
+        )
+        self.assertEqual(r.status_code, 302)
+        self.regular.refresh_from_db()
+        self.assertFalse(self.regular.is_active)
+
+    def test_moderator_cannot_deactivate_admin(self):
+        self.client.login(username="modu", password="modpw")
+        r = self.client.post(
+            reverse("chat:admin_toggle_user_active", args=[self.admin.pk]),
+            {"action": "deactivate"},
+        )
+        self.assertEqual(r.status_code, 302)
+        self.admin.refresh_from_db()
+        self.assertTrue(self.admin.is_active)
+
+    def test_moderator_cannot_deactivate_other_moderator(self):
+        self.client.login(username="modu", password="modpw")
+        r = self.client.post(
+            reverse("chat:admin_toggle_user_active", args=[self.other_mod.pk]),
+            {"action": "deactivate"},
+        )
+        self.assertEqual(r.status_code, 302)
+        self.other_mod.refresh_from_db()
+        self.assertTrue(self.other_mod.is_active)
+
+    def test_moderator_can_open_moderation_panel(self):
+        self.client.login(username="modu", password="modpw")
+        r = self.client.get(reverse("chat:admin_users"))
+        self.assertEqual(r.status_code, 200)
+        self.assertContains(r, "Panel moderacji")
+
+    def test_moderator_cannot_change_role_via_endpoint(self):
+        self.client.login(username="modu", password="modpw")
+        r = self.client.post(
+            reverse("chat:change_role", args=[self.regular.pk]),
+            {"role": "moderator"},
+        )
+        self.assertEqual(r.status_code, 302)
+        self.regular.profile.refresh_from_db()
+        self.assertEqual(self.regular.profile.role, "user")
 
 
 class MessagePushPreviewTests(TestCase):

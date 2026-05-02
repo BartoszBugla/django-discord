@@ -19,5 +19,13 @@ python manage.py ensure_admin_user
 PORT="${PORT:-8000}"
 BIND="${BIND:-0.0.0.0:${PORT}}"
 
-echo "==> gunicorn (ASGI) on ${BIND}"
-exec python -m gunicorn mysite.asgi:application -k uvicorn.workers.UvicornWorker --bind "${BIND}" --timeout 0 --graceful-timeout 30
+# Render (i inne reverse proxy): poprawne IP klienta / nagłówki X-Forwarded-* dla Uvicorn workera.
+FORWARDED="${FORWARDED_ALLOW_IPS:-*}"
+
+if [[ "${USE_DAPHNE:-0}" == "1" ]]; then
+  echo "==> daphne (ASGI) on ${BIND} — osobna implementacja WS (Twisted), często najmniej problemów na PaaS"
+  exec daphne -b "${BIND%:*}" -p "${BIND##*:}" mysite.asgi:application
+fi
+
+echo "==> gunicorn + UvicornWorker (ASGI) on ${BIND} — wymaga pakietu websockets (patrz requirements.txt)"
+exec python -m gunicorn mysite.asgi:application -k uvicorn.workers.UvicornWorker --bind "${BIND}" --timeout 0 --graceful-timeout 30 --forwarded-allow-ips "${FORWARDED}"

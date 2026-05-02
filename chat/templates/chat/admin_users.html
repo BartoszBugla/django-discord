@@ -1,5 +1,5 @@
 {% extends 'chat/base.html' %}
-{% block title %}Panel administratora — Django Discord{% endblock %}
+{% block title %}{% if is_full_admin %}Panel administratora{% else %}Panel moderacji{% endif %} — Django Discord{% endblock %}
 
 {% block content %}
 <div class="app-container">
@@ -7,7 +7,10 @@
 
     <div class="main-content">
         <div class="top-bar">
-            <h5><i class="bi bi-shield-lock"></i> Panel administratora</h5>
+            <h5><i class="bi bi-shield-lock"></i> {% if is_full_admin %}Panel administratora{% else %}Panel moderacji{% endif %}</h5>
+            {% if not is_full_admin %}
+            <p class="text-muted small mb-0">Jako moderator możesz blokować i odblokowywać wyłącznie konta z rolą „Użytkownik”.</p>
+            {% endif %}
         </div>
 
         <div class="content-area p-4">
@@ -17,7 +20,7 @@
             {% endfor %}
             {% endif %}
 
-            <h5>Użytkownicy ({{ users.count }})</h5>
+            <h5>Użytkownicy ({{ users|length }})</h5>
             <div class="table-responsive">
                 <table class="table table-hover">
                     <thead>
@@ -27,7 +30,7 @@
                             <th>Rola</th>
                             <th>Obecność</th>
                             <th>Konto</th>
-                            <th>Zmiana roli</th>
+                            {% if is_full_admin %}<th>Zmiana roli</th>{% endif %}
                         </tr>
                     </thead>
                     <tbody>
@@ -52,10 +55,10 @@
                                 {% else %}
                                 <span class="badge bg-danger">Zablokowane</span>
                                 {% endif %}
-                                {% if u != request.user %}
-                                    {% if not u.is_superuser or request.user.is_superuser %}
+                                {% if u.id in toggle_allowed_ids %}
                                     <form method="post" action="{% url 'chat:admin_toggle_user_active' user_id=u.id %}" class="d-inline ms-1">
                                         {% csrf_token %}
+                                        <input type="hidden" name="next" value="{% url 'chat:admin_users' %}">
                                         {% if u.is_active %}
                                         <input type="hidden" name="action" value="deactivate">
                                         <button type="submit" class="btn btn-sm btn-outline-danger" onclick="return confirm('Zablokować to konto? Użytkownik straci dostęp do aplikacji.')">Zablokuj konto</button>
@@ -64,9 +67,9 @@
                                         <button type="submit" class="btn btn-sm btn-outline-success">Odblokuj konto</button>
                                         {% endif %}
                                     </form>
-                                    {% endif %}
                                 {% endif %}
                             </td>
+                            {% if is_full_admin %}
                             <td>
                                 {% if u != request.user %}
                                 <form method="post" action="{% url 'chat:change_role' user_id=u.id %}" class="d-inline-flex gap-1">
@@ -82,12 +85,14 @@
                                 <span class="text-muted small">Ty</span>
                                 {% endif %}
                             </td>
+                            {% endif %}
                         </tr>
                         {% endfor %}
                     </tbody>
                 </table>
             </div>
 
+            {% if is_full_admin %}
             <h5 class="mt-4">Kanały ({{ channels.count }})</h5>
             <div class="table-responsive">
                 <table class="table table-hover">
@@ -126,6 +131,7 @@
                     </tbody>
                 </table>
             </div>
+            {% endif %}
         </div>
     </div>
 </div>

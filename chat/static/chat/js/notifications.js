@@ -16,7 +16,6 @@
         return !!(data.from_username && data.from_username === c.username);
     }
 
-    /** Czy uzytkownik ma otwarty ten kanal w aplikacji (widok kanalu). */
     function isViewingChannel(channelId) {
         var c = getCtx();
         return (
@@ -24,7 +23,6 @@
         );
     }
 
-    /** Czy uzytkownik ma otwarta rozmowe z nadawca (widok DM). */
     function isViewingDmFrom(fromUserId) {
         var c = getCtx();
         return (
@@ -32,6 +30,7 @@
         );
     }
 
+    /** Czy użytkownik ma zobaczyć alert (inna rozmowa lub ta sama, ale karta w tle). */
     function shouldNotifyChannel(data) {
         if (isOwnMessage(data)) {
             return false;
@@ -52,22 +51,6 @@
             return false;
         }
         return true;
-    }
-
-    /** Toast w aplikacji: tylko gdy ten kanal nie jest aktualnie otwarty. */
-    function shouldShowInAppChannel(data) {
-        if (isOwnMessage(data)) {
-            return false;
-        }
-        return !isViewingChannel(data.channel_id);
-    }
-
-    /** Toast w aplikacji: tylko gdy nie ma otwartego DM z tym nadawca. */
-    function shouldShowInAppDm(data) {
-        if (isOwnMessage(data)) {
-            return false;
-        }
-        return !isViewingDmFrom(data.from_user_id);
     }
 
     function truncate(s, n) {
@@ -182,36 +165,6 @@
         }, 220);
     }
 
-    function showBrowserNotification(title, body, url) {
-        if (!("Notification" in window)) {
-            return;
-        }
-        if (Notification.permission === "granted") {
-            try {
-                var n = new Notification(title, { body: body, tag: url || title });
-                if (url && n && typeof n.onclick === "function") {
-                    n.onclick = function () {
-                        window.focus();
-                        window.location.href = url;
-                        try {
-                            n.close();
-                        } catch (e) {
-                            /* ignore */
-                        }
-                    };
-                }
-            } catch (e) {
-                /* ignore */
-            }
-        } else if (Notification.permission === "default") {
-            Notification.requestPermission().then(function (p) {
-                if (p === "granted") {
-                    showBrowserNotification(title, body, url);
-                }
-            });
-        }
-    }
-
     function handleInboxPayload(data) {
         if (!data || !data.kind) {
             return;
@@ -225,6 +178,9 @@
         var body = "";
 
         if (data.kind === "channel") {
+            if (!shouldNotifyChannel(data)) {
+                return;
+            }
             title = "#" + (data.channel_name || "kanał");
             body =
                 (data.from_username || "") +
@@ -235,6 +191,9 @@
                 url += "#message-" + encodeURIComponent(String(data.message_id));
             }
         } else if (data.kind === "dm") {
+            if (!shouldNotifyDm(data)) {
+                return;
+            }
             title = "Wiadomość od " + (data.from_username || "użytkownik");
             body = truncate(data.preview || "", 120);
             url = "/dm/" + encodeURIComponent(data.from_user_id) + "/";
@@ -245,23 +204,11 @@
             return;
         }
 
-        if (data.kind === "channel" && shouldShowInAppChannel(data)) {
-            showInAppToast(title, body, url);
-        } else if (data.kind === "dm" && shouldShowInAppDm(data)) {
-            showInAppToast(title, body, url);
-        }
-
-        if (data.kind === "channel" && !shouldNotifyChannel(data)) {
-            return;
-        }
-        if (data.kind === "dm" && !shouldNotifyDm(data)) {
-            return;
-        }
+        showInAppToast(title, body, url);
 
         if (document.hidden || !document.hasFocus()) {
             bumpTitle();
         }
-        showBrowserNotification(title, body, url);
     }
 
     function connectInbox() {
@@ -293,10 +240,12 @@
 
     connectInbox();
 
-    window.__requestNotificationPermission = function () {
-        if (!("Notification" in window)) {
-            return Promise.resolve("unsupported");
-        }
-        return Notification.requestPermission();
+    /** Podgląd stylu toastów (strona ustawień / debug). */
+    window.__showAppNotificationDemo = function () {
+        showInAppToast(
+            "Django Discord — test",
+            "Tak wyglądają powiadomienia w aplikacji (WebSocket /ws/inbox/, bez powiadomień systemowych przeglądarki).",
+            window.location.pathname || "/"
+        );
     };
 })();

@@ -1,5 +1,5 @@
 {% extends 'chat/base.html' %}
-{% block title %}Powiadomienia przeglądarki — Django Discord{% endblock %}
+{% block title %}Powiadomienia w aplikacji — Django Discord{% endblock %}
 
 {% block content %}
 <div class="app-container">
@@ -7,32 +7,32 @@
 
     <div class="main-content">
         <div class="top-bar">
-            <h5><i class="bi bi-bell"></i> Powiadomienia przeglądarki</h5>
+            <h5><i class="bi bi-bell"></i> Powiadomienia w aplikacji</h5>
         </div>
 
         <div class="content-area p-4">
             <div class="notifications-settings-card card shadow-sm border-0 mx-auto" style="max-width: 520px;">
                 <div class="card-body p-4">
                     <p class="text-muted mb-3">
-                        Gdy włączysz powiadomienia, przeglądarka może pokazać alert o nowej wiadomości na innym kanale
-                        lub w innej rozmowie prywatnej, także gdy karta jest w tle. Działa to tylko w tej przeglądarce i wymaga Twojej zgody.
+                        Nowe wiadomości na innych kanałach lub w innych rozmowach prywatnych pokazujemy jako
+                        <strong>powiadomienia w tej karcie</strong> (toast u góry ekranu). Działa to przez połączenie
+                        WebSocket <code class="small">/ws/inbox/</code> — bez zgody na powiadomienia systemowe
+                        przeglądarki i bez wyskakujących okien spoza aplikacji.
+                    </p>
+                    <p class="text-muted small mb-4">
+                        Gdy masz otwarty dokładnie ten kanał lub tę rozmowę i karta jest na pierwszym planie,
+                        nie pokazujemy duplikatu — nadal widzisz wiadomości na miejscu.
                     </p>
 
-                    <div class="d-flex align-items-center flex-wrap gap-2 mb-4">
-                        <span class="text-secondary small text-uppercase fw-semibold">Status</span>
-                        <span id="notify-status-badge" class="badge rounded-pill bg-secondary">Sprawdzanie…</span>
-                    </div>
-
                     <div class="d-flex flex-wrap gap-2 mb-3">
-                        <button type="button" class="btn btn-primary" id="notify-btn-request">
-                            <i class="bi bi-bell me-1"></i> Poproś o zgodę
-                        </button>
-                        <button type="button" class="btn btn-outline-primary" id="notify-btn-test" disabled>
-                            Wyślij test
+                        <button type="button" class="btn btn-primary" id="notify-btn-demo">
+                            <i class="bi bi-easel me-1"></i> Pokaż przykładowe powiadomienie
                         </button>
                     </div>
 
-                    <p id="notify-hint" class="small text-muted mb-0"></p>
+                    <p id="notify-hint" class="small text-muted mb-0">
+                        Jeśli po kliknięciu nie widać paska, upewnij się, że jesteś zalogowany i że skrypt powiadomień się wczytał.
+                    </p>
                 </div>
             </div>
         </div>
@@ -43,70 +43,18 @@
 {% block extra_js %}
 <script>
 (function () {
-    var badge = document.getElementById("notify-status-badge");
-    var btnRequest = document.getElementById("notify-btn-request");
-    var btnTest = document.getElementById("notify-btn-test");
+    var btn = document.getElementById("notify-btn-demo");
     var hint = document.getElementById("notify-hint");
-
-    function setBadge(text, variant) {
-        badge.textContent = text;
-        badge.className = "badge rounded-pill bg-" + variant;
-    }
-
-    function refreshUi() {
-        if (!("Notification" in window)) {
-            setBadge("Niedostępne", "secondary");
-            btnRequest.disabled = true;
-            btnTest.disabled = true;
-            hint.textContent = "Ta przeglądarka nie obsługuje powiadomień systemowych.";
-            return;
-        }
-        var p = Notification.permission;
-        if (p === "granted") {
-            setBadge("Włączone", "success");
-            btnRequest.textContent = "Odśwież zgodę (już włączone)";
-            btnRequest.disabled = false;
-            btnTest.disabled = false;
-            hint.textContent = "Nowe wiadomości z innych kanałów lub rozmów prywatnych pojawią się jako powiadomienia, gdy nie patrzysz na daną rozmowę.";
-        } else if (p === "denied") {
-            setBadge("Odrzucone", "danger");
-            btnRequest.disabled = true;
-            btnTest.disabled = true;
-            hint.textContent = "Zgoda została odrzucona. W Chrome: ikona kłódki obok paska adresu → Ustawienia witryny → Powiadomienia.";
-        } else {
-            setBadge("Nie wybrano", "warning");
-            btnRequest.disabled = false;
-            btnTest.disabled = true;
-            hint.textContent = "Kliknij „Poproś o zgodę”, aby przeglądarka wyświetliła okno zgody.";
-        }
-    }
-
-    btnRequest.addEventListener("click", function () {
-        if (!("Notification" in window)) {
-            return;
-        }
-        Notification.requestPermission().then(function () {
-            refreshUi();
-        }).catch(function () {
-            hint.textContent = "Nie udało się wyświetlić prośby o zgodę.";
+    if (btn) {
+        btn.addEventListener("click", function () {
+            if (typeof window.__showAppNotificationDemo === "function") {
+                window.__showAppNotificationDemo();
+                hint.textContent = "Powinien pojawić się toast (in-app).";
+            } else {
+                hint.textContent = "Brak funkcji podglądu — odśwież stronę (wymagane zalogowanie).";
+            }
         });
-    });
-
-    btnTest.addEventListener("click", function () {
-        if (!("Notification" in window) || Notification.permission !== "granted") {
-            return;
-        }
-        try {
-            new Notification("Django Discord — test", {
-                body: "Jeśli widzisz ten komunikat, powiadomienia działają.",
-                tag: "django-discord-test"
-            });
-        } catch (e) {
-            hint.textContent = "Błąd wysyłania testu: " + (e && e.message ? e.message : "nieznany");
-        }
-    });
-
-    refreshUi();
+    }
 })();
 </script>
 {% endblock %}
