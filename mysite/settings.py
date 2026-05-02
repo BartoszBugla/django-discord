@@ -179,8 +179,25 @@ STORAGES = {
     },
 }
 
-MEDIA_URL = '/media/'
-MEDIA_ROOT = BASE_DIR / 'media'
+MEDIA_URL = "/media/"
+MEDIA_ROOT = BASE_DIR / "media"
+# Render Disk lub inny montowany katalog — inaczej pliki giną przy każdym deployu.
+_django_media_root = os.environ.get("DJANGO_MEDIA_ROOT")
+if _django_media_root:
+    MEDIA_ROOT = Path(_django_media_root)
+
+# Przy DEBUG=False Django nie podpina /media/ (patrz urls.py). Na Render bez tego zdjęcia i audio zwracają 404.
+# Po przejściu na S3/Cloudinary ustaw SERVE_MEDIA_FROM_DJANGO=false i skonfiguruj STORAGES.
+if DEBUG:
+    SERVE_MEDIA_FROM_DJANGO = True
+else:
+    _sm = os.environ.get("SERVE_MEDIA_FROM_DJANGO", "").lower()
+    if _sm in ("false", "0", "no"):
+        SERVE_MEDIA_FROM_DJANGO = False
+    elif _sm in ("true", "1", "yes"):
+        SERVE_MEDIA_FROM_DJANGO = True
+    else:
+        SERVE_MEDIA_FROM_DJANGO = bool(os.environ.get("RENDER"))
 
 LOGIN_URL = '/login/'
 LOGIN_REDIRECT_URL = '/'
