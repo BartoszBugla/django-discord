@@ -1,17 +1,21 @@
 {% extends 'chat/base.html' %}
-{% block title %}Rejestracja - Django Discord{% endblock %}
+{% block title %}Rejestracja — Django Discord{% endblock %}
 
 {% block content %}
 <div class="d-flex justify-content-center align-items-center" style="min-height: 100vh;">
     <div class="card shadow-sm" style="width: 100%; max-width: 420px;">
         <div class="card-body p-4">
-            <h2 class="text-center mb-4">Utworz konto</h2>
+            <h2 class="text-center mb-4">Utwórz konto</h2>
+            <p class="text-center text-muted small mb-4">Wypełnij pola poniżej. Hasło musi mieć co najmniej 8 znaków.</p>
 
             <form method="post">
                 {% csrf_token %}
+                {% if form.non_field_errors %}
+                <div class="alert alert-danger">{{ form.non_field_errors }}</div>
+                {% endif %}
                 {% for field in form %}
                 <div class="mb-3">
-                    <label class="form-label">{{ field.label }}</label>
+                    <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
                     {{ field }}
                     {% if field.errors %}
                     <div class="text-danger small mt-1">
@@ -23,10 +27,10 @@
                     {% endif %}
                 </div>
                 {% endfor %}
-                <button type="submit" class="btn btn-primary w-100">Zarejestruj sie</button>
+                <button type="submit" class="btn btn-primary w-100">Zarejestruj się</button>
             </form>
-            <p class="text-center mt-3">
-                Masz juz konto? <a href="{% url 'chat:login' %}">Zaloguj sie</a>
+            <p class="text-center mt-3 mb-0">
+                Masz już konto? <a href="{% url 'chat:login' %}">Zaloguj się</a>
             </p>
         </div>
     </div>

@@ -133,7 +133,7 @@
         inner.tabIndex = 0;
         inner.setAttribute(
             "aria-label",
-            "Otworz: " + (title || "").replace(/"/g, "")
+            "Otwórz: " + (title || "").replace(/"/g, "")
         );
 
         var titleEl = document.createElement("div");
@@ -225,7 +225,7 @@
         var body = "";
 
         if (data.kind === "channel") {
-            title = "#" + (data.channel_name || "kanal");
+            title = "#" + (data.channel_name || "kanał");
             body =
                 (data.from_username || "") +
                 ": " +
@@ -235,7 +235,7 @@
                 url += "#message-" + encodeURIComponent(String(data.message_id));
             }
         } else if (data.kind === "dm") {
-            title = "Wiadomosc od " + (data.from_username || "uzytkownik");
+            title = "Wiadomość od " + (data.from_username || "użytkownik");
             body = truncate(data.preview || "", 120);
             url = "/dm/" + encodeURIComponent(data.from_user_id) + "/";
             if (data.message_id != null && data.message_id !== "") {

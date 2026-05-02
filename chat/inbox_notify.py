@@ -12,12 +12,12 @@ def message_push_preview(message) -> str:
     if t:
         return t[:200]
     if has_img and has_aud:
-        return "Zdjecie i plik audio"
+        return "Zdjęcie i plik audio"
     if has_img:
-        return "Zdjecie"
+        return "Zdjęcie"
     if has_aud:
         return "Plik audio"
-    return "Nowa wiadomosc"
+    return "Nowa wiadomość"
 
 
 def _layer_send(group, payload):

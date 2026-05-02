@@ -1,5 +1,5 @@
 {% extends 'chat/base.html' %}
-{% block title %}Panel administracyjny - Django Discord{% endblock %}
+{% block title %}Panel administratora — Django Discord{% endblock %}
 
 {% block content %}
 <div class="app-container">
@@ -7,7 +7,7 @@
 
     <div class="main-content">
         <div class="top-bar">
-            <h5><i class="bi bi-shield-lock"></i> Panel administracyjny</h5>
+            <h5><i class="bi bi-shield-lock"></i> Panel administratora</h5>
         </div>
 
         <div class="content-area p-4">
@@ -17,17 +17,17 @@
             {% endfor %}
             {% endif %}
 
-            <h5>Uzytkownicy ({{ users.count }})</h5>
+            <h5>Użytkownicy ({{ users.count }})</h5>
             <div class="table-responsive">
                 <table class="table table-hover">
                     <thead>
                         <tr>
-                            <th>Uzytkownik</th>
-                            <th>Email</th>
+                            <th>Użytkownik</th>
+                            <th>E-mail</th>
                             <th>Rola</th>
-                            <th>Status</th>
+                            <th>Obecność</th>
                             <th>Konto</th>
-                            <th>Zmien role</th>
+                            <th>Zmiana roli</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -44,7 +44,7 @@
                             </td>
                             <td>
                                 <span class="status-dot {% if u.profile.appears_online %}online{% else %}offline{% endif %}"></span>
-                                {% if u.profile.appears_online %}Online{% else %}Offline{% endif %}
+                                {% if u.profile.appears_online %}Dostępny{% else %}Niedostępny{% endif %}
                             </td>
                             <td>
                                 {% if u.is_active %}
@@ -58,10 +58,10 @@
                                         {% csrf_token %}
                                         {% if u.is_active %}
                                         <input type="hidden" name="action" value="deactivate">
-                                        <button type="submit" class="btn btn-sm btn-outline-danger" onclick="return confirm('Zablokowac to konto? Uzytkownik straci dostep do aplikacji.')">Zablokuj</button>
+                                        <button type="submit" class="btn btn-sm btn-outline-danger" onclick="return confirm('Zablokować to konto? Użytkownik straci dostęp do aplikacji.')">Zablokuj konto</button>
                                         {% else %}
                                         <input type="hidden" name="action" value="activate">
-                                        <button type="submit" class="btn btn-sm btn-outline-success">Odblokuj</button>
+                                        <button type="submit" class="btn btn-sm btn-outline-success">Odblokuj konto</button>
                                         {% endif %}
                                     </form>
                                     {% endif %}
@@ -71,12 +71,12 @@
                                 {% if u != request.user %}
                                 <form method="post" action="{% url 'chat:change_role' user_id=u.id %}" class="d-inline-flex gap-1">
                                     {% csrf_token %}
-                                    <select name="role" class="form-select form-select-sm" style="width: auto;">
-                                        <option value="user" {% if u.profile.role == 'user' %}selected{% endif %}>Uzytkownik</option>
+                                    <select name="role" class="form-select form-select-sm" style="width: auto;" aria-label="Rola użytkownika {{ u.username }}">
+                                        <option value="user" {% if u.profile.role == 'user' %}selected{% endif %}>Użytkownik</option>
                                         <option value="moderator" {% if u.profile.role == 'moderator' %}selected{% endif %}>Moderator</option>
                                         <option value="admin" {% if u.profile.role == 'admin' %}selected{% endif %}>Administrator</option>
                                     </select>
-                                    <button class="btn btn-sm btn-warning">Zapisz</button>
+                                    <button type="submit" class="btn btn-sm btn-warning">Zapisz</button>
                                 </form>
                                 {% else %}
                                 <span class="text-muted small">Ty</span>
@@ -88,15 +88,15 @@
                 </table>
             </div>
 
-            <h5 class="mt-4">Kanaly ({{ channels.count }})</h5>
+            <h5 class="mt-4">Kanały ({{ channels.count }})</h5>
             <div class="table-responsive">
                 <table class="table table-hover">
                     <thead>
                         <tr>
                             <th>Nazwa</th>
                             <th>Opis</th>
-                            <th>Tworca</th>
-                            <th>Czlonkowie</th>
+                            <th>Twórca</th>
+                            <th>Członkowie</th>
                             <th>Akcje</th>
                         </tr>
                     </thead>
@@ -114,14 +114,14 @@
                             <td>
                                 <form method="post" action="{% url 'chat:delete_channel' channel_id=ch.id %}" class="d-inline">
                                     {% csrf_token %}
-                                    <button class="btn btn-sm btn-outline-danger" onclick="return confirm('Na pewno usunac kanal {{ ch.nazwa }}?')">
-                                        <i class="bi bi-trash"></i> Usun
+                                    <button type="submit" class="btn btn-sm btn-outline-danger" onclick="return confirm('Na pewno usunąć kanał „{{ ch.nazwa }}”?')">
+                                        <i class="bi bi-trash"></i> Usuń
                                     </button>
                                 </form>
                             </td>
                         </tr>
                         {% empty %}
-                        <tr><td colspan="5" class="text-muted">Brak kanalow.</td></tr>
+                        <tr><td colspan="5" class="text-muted">Brak kanałów.</td></tr>
                         {% endfor %}
                     </tbody>
                 </table>

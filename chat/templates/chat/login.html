@@ -1,12 +1,12 @@
 {% extends 'chat/base.html' %}
-{% block title %}Logowanie - Django Discord{% endblock %}
+{% block title %}Logowanie — Django Discord{% endblock %}
 
 {% block content %}
 <div class="d-flex justify-content-center align-items-center" style="min-height: 100vh;">
     <div class="card shadow-sm" style="width: 100%; max-width: 420px;">
         <div class="card-body p-4">
-            <h2 class="text-center mb-4">Witaj ponownie!</h2>
-            <p class="text-center text-muted mb-4">Cieszymy sie ze Cie widzimy!</p>
+            <h2 class="text-center mb-4">Witaj ponownie</h2>
+            <p class="text-center text-muted mb-4">Zaloguj się, aby wrócić do rozmów.</p>
 
             {% if messages %}
             {% for msg in messages %}
@@ -20,18 +20,18 @@
                 <input type="hidden" name="next" value="{{ request.GET.next }}">
                 {% endif %}
                 <div class="mb-3">
-                    <label class="form-label">Login</label>
-                    <input type="text" name="username" class="form-control" required
+                    <label class="form-label">Nazwa użytkownika</label>
+                    <input type="text" name="username" class="form-control" required autocomplete="username"
                            value="{{ request.POST.username|default:'' }}">
                 </div>
                 <div class="mb-3">
-                    <label class="form-label">Haslo</label>
-                    <input type="password" name="password" class="form-control" required>
+                    <label class="form-label">Hasło</label>
+                    <input type="password" name="password" class="form-control" required autocomplete="current-password">
                 </div>
-                <button type="submit" class="btn btn-primary w-100">Zaloguj sie</button>
+                <button type="submit" class="btn btn-primary w-100">Zaloguj się</button>
             </form>
-            <p class="text-center mt-3">
-                Nie masz konta? <a href="{% url 'chat:register' %}">Zarejestruj sie</a>
+            <p class="text-center mt-3 mb-0">
+                Nie masz konta? <a href="{% url 'chat:register' %}">Zarejestruj się</a>
             </p>
         </div>
     </div>

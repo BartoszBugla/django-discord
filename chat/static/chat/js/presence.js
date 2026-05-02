@@ -65,7 +65,7 @@
       dot.classList.toggle("offline", !online);
     }
     if (label) {
-      label.textContent = online ? "Online" : "Offline";
+      label.textContent = online ? "Dostępny" : "Niedostępny";
     }
   }
 

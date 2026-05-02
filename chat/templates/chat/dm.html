@@ -1,5 +1,5 @@
 {% extends 'chat/base.html' %}
-{% block title %}DM z {{ other_user.username }} - Django Discord{% endblock %}
+{% block title %}Rozmowa z {{ other_user.username }} — Django Discord{% endblock %}
 
 {% block content %}
 <div class="app-container">
@@ -10,9 +10,9 @@
             <h5>
                 <i class="bi bi-chat-dots"></i> {{ other_user.username }}
                 {% if other_user.profile.role == 'admin' %}
-                <span class="role-tag role-tag-admin">ADMIN</span>
+                <span class="role-tag role-tag-admin">Administrator</span>
                 {% elif other_user.profile.role == 'moderator' %}
-                <span class="role-tag role-tag-mod">MOD</span>
+                <span class="role-tag role-tag-mod">Moderator</span>
                 {% endif %}
             </h5>
             <div class="d-flex align-items-center gap-2">
@@ -31,9 +31,9 @@
                         {{ msg.autor.username }}
                     </a>
                     {% if msg.autor.profile.role == 'admin' %}
-                    <span class="role-tag role-tag-admin">ADMIN</span>
+                    <span class="role-tag role-tag-admin">Administrator</span>
                     {% elif msg.autor.profile.role == 'moderator' %}
-                    <span class="role-tag role-tag-mod">MOD</span>
+                    <span class="role-tag role-tag-mod">Moderator</span>
                     {% endif %}
                     <span class="message-time">{{ msg.timestamp|date:"d.m.Y H:i" }}</span>
 
@@ -41,7 +41,7 @@
                     <form method="post" action="{% url 'chat:delete_message' message_id=msg.id %}" class="d-inline ms-auto">
                         {% csrf_token %}
                         <input type="hidden" name="next" value="{% url 'chat:dm' user_id=other_user.id %}">
-                        <button class="btn-delete-msg" title="Usun wiadomosc" onclick="return confirm('Usunac te wiadomosc?')">
+                        <button type="submit" class="btn-delete-msg" title="Usuń wiadomość" onclick="return confirm('Usunąć tę wiadomość?')">
                             <i class="bi bi-trash"></i>
                         </button>
                     </form>
@@ -52,7 +52,7 @@
                 <div class="message-text">{{ msg.tresc }}</div>
                 {% endif %}
                 {% if msg.obrazek %}
-                <div class="mt-1"><img src="{{ msg.obrazek.url }}" class="chat-image"></div>
+                <div class="mt-1"><img src="{{ msg.obrazek.url }}" class="chat-image" alt="Załączony obraz"></div>
                 {% endif %}
                 {% if msg.audio %}
                 <div class="mt-1"><audio controls src="{{ msg.audio.url }}"></audio></div>
@@ -65,16 +65,16 @@
             <form method="post" enctype="multipart/form-data" class="d-flex gap-2 align-items-center w-100" id="dm-form">
                 {% csrf_token %}
                 <input type="text" name="tresc" class="form-control" id="dm-input"
-                       placeholder="Napisz wiadomosc do {{ other_user.username }}..." autocomplete="off">
-                <label class="btn btn-outline-secondary btn-sm" title="Dodaj obrazek">
+                       placeholder="Napisz wiadomość do {{ other_user.username }}…" autocomplete="off">
+                <label class="btn btn-outline-secondary btn-sm" title="Dodaj obraz">
                     <i class="bi bi-image"></i>
                     <input type="file" name="obrazek" accept="image/*" hidden onchange="this.form.submit()">
                 </label>
-                <label class="btn btn-outline-secondary btn-sm" title="Dodaj audio">
+                <label class="btn btn-outline-secondary btn-sm" title="Dodaj nagranie audio">
                     <i class="bi bi-mic"></i>
                     <input type="file" name="audio" accept="audio/*" hidden onchange="this.form.submit()">
                 </label>
-                <button type="submit" class="btn btn-primary btn-sm"><i class="bi bi-send"></i></button>
+                <button type="submit" class="btn btn-primary btn-sm" title="Wyślij"><i class="bi bi-send"></i></button>
             </form>
         </div>
     </div>

@@ -65,7 +65,7 @@ class AdminAccountBlockTests(TestCase):
             {"username": "vic", "password": "wrong"},
         )
         self.assertEqual(r.status_code, 200)
-        self.assertContains(r, "Nieprawidlowy login")
+        self.assertContains(r, "Nieprawidłowa nazwa użytkownika lub hasło.")
 
     def test_admin_can_deactivate_user_via_panel(self):
         self.client.login(username="adm", password="adm")
@@ -92,7 +92,7 @@ class MessagePushPreviewTests(TestCase):
     def test_preview_image_only(self):
         img = SimpleUploadedFile("f.jpg", b"\xff\xd8\xff", content_type="image/jpeg")
         m = Message.objects.create(autor=self.a, channel=self.ch, tresc="", obrazek=img)
-        self.assertEqual(message_push_preview(m), "Zdjecie")
+        self.assertEqual(message_push_preview(m), "Zdjęcie")
 
     def test_preview_audio_only(self):
         aud = SimpleUploadedFile("a.mp3", b"id3", content_type="audio/mpeg")
@@ -101,7 +101,7 @@ class MessagePushPreviewTests(TestCase):
 
     def test_preview_empty(self):
         m = Message.objects.create(autor=self.a, channel=self.ch, tresc="")
-        self.assertEqual(message_push_preview(m), "Nowa wiadomosc")
+        self.assertEqual(message_push_preview(m), "Nowa wiadomość")
 
 
 class SearchApiTests(TestCase):

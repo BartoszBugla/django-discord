@@ -1,5 +1,5 @@
 {% extends 'chat/base.html' %}
-{% block title %}Wiadomosci prywatne - Django Discord{% endblock %}
+{% block title %}Wiadomości prywatne — Django Discord{% endblock %}
 
 {% block content %}
 <div class="app-container">
@@ -7,7 +7,7 @@
 
     <div class="main-content">
         <div class="top-bar">
-            <h5><i class="bi bi-chat-dots"></i> Wiadomosci prywatne</h5>
+            <h5><i class="bi bi-chat-dots"></i> Wiadomości prywatne</h5>
         </div>
 
         <div class="content-area p-4">
@@ -17,28 +17,28 @@
                 <div class="avatar-placeholder-small me-2">{{ u.username|first|upper }}</div>
                 <span>{{ u.username }}</span>
                 {% if u.profile.role == 'admin' %}
-                <span class="role-tag role-tag-admin ms-1">ADMIN</span>
+                <span class="role-tag role-tag-admin ms-1">Administrator</span>
                 {% elif u.profile.role == 'moderator' %}
-                <span class="role-tag role-tag-mod ms-1">MOD</span>
+                <span class="role-tag role-tag-mod ms-1">Moderator</span>
                 {% endif %}
                 <span class="ms-auto">
                     <span class="status-dot {% if u.profile.appears_online %}online{% else %}offline{% endif %}"></span>
                 </span>
             </a>
             {% empty %}
-            <p class="text-muted">Brak rozmow prywatnych. Odwiedz profil uzytkownika aby rozpoczac rozmowe.</p>
+            <p class="text-muted">Brak rozmów prywatnych. Odwiedź profil użytkownika, aby napisać pierwszą wiadomość.</p>
             {% endfor %}
 
-            <h5 class="mt-4">Wszyscy uzytkownicy</h5>
-            <p class="text-muted small">Kliknij na uzytkownika aby rozpoczac rozmowe.</p>
+            <h5 class="mt-4">Wszyscy użytkownicy</h5>
+            <p class="text-muted small">Kliknij użytkownika, aby otworzyć rozmowę.</p>
             {% for u in all_users %}
             <a href="{% url 'chat:dm' user_id=u.id %}" class="dm-item d-flex align-items-center p-2">
                 <div class="avatar-placeholder-small me-2">{{ u.username|first|upper }}</div>
                 <span>{{ u.username }}</span>
                 {% if u.profile.role == 'admin' %}
-                <span class="role-tag role-tag-admin ms-1">ADMIN</span>
+                <span class="role-tag role-tag-admin ms-1">Administrator</span>
                 {% elif u.profile.role == 'moderator' %}
-                <span class="role-tag role-tag-mod ms-1">MOD</span>
+                <span class="role-tag role-tag-mod ms-1">Moderator</span>
                 {% endif %}
             </a>
             {% endfor %}

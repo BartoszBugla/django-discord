@@ -1,6 +1,6 @@
 {% extends 'chat/base.html' %}
 {% load chat_extras %}
-{% block title %}#{{ channel.nazwa }} - Django Discord{% endblock %}
+{% block title %}#{{ channel.nazwa }} — Django Discord{% endblock %}
 
 {% block content %}
 <div class="app-container">
@@ -12,13 +12,13 @@
             <div class="d-flex align-items-center gap-2">
                 <span class="text-muted small">{{ channel.opis }}</span>
                 <a href="{% url 'chat:leave_channel' channel_id=channel.id %}" class="btn btn-sm btn-outline-secondary"
-                   onclick="return confirm('Na pewno opuscic kanal?')">
-                    <i class="bi bi-box-arrow-left"></i> Opusc
+                   onclick="return confirm('Na pewno opuścić ten kanał?')">
+                    <i class="bi bi-box-arrow-left"></i> Opuść
                 </a>
                 {% if request.user == channel.tworca or request.user.profile.role == 'admin' or request.user.is_superuser %}
                 <form method="post" action="{% url 'chat:delete_channel' channel_id=channel.id %}">
                     {% csrf_token %}
-                    <button class="btn btn-sm btn-outline-danger" onclick="return confirm('Na pewno usunac kanal?')">
+                    <button type="submit" class="btn btn-sm btn-outline-danger" title="Usuń kanał" onclick="return confirm('Na pewno usunąć ten kanał? Ta operacja jest nieodwracalna.')">
                         <i class="bi bi-trash"></i>
                     </button>
                 </form>
@@ -43,9 +43,9 @@
                         {{ msg.autor.username }}
                     </a>
                     {% if msg.autor.profile.role == 'admin' %}
-                    <span class="role-tag role-tag-admin">ADMIN</span>
+                    <span class="role-tag role-tag-admin">Administrator</span>
                     {% elif msg.autor.profile.role == 'moderator' %}
-                    <span class="role-tag role-tag-mod">MOD</span>
+                    <span class="role-tag role-tag-mod">Moderator</span>
                     {% endif %}
                     <span class="message-time">{{ msg.timestamp|date:"d.m.Y H:i" }}</span>
 
@@ -53,7 +53,7 @@
                     <form method="post" action="{% url 'chat:delete_message' message_id=msg.id %}" class="d-inline ms-auto">
                         {% csrf_token %}
                         <input type="hidden" name="next" value="{% url 'chat:channel' channel_id=channel.id %}">
-                        <button class="btn-delete-msg" title="Usun wiadomosc" onclick="return confirm('Usunac te wiadomosc?')">
+                        <button type="submit" class="btn-delete-msg" title="Usuń wiadomość" onclick="return confirm('Usunąć tę wiadomość?')">
                             <i class="bi bi-trash"></i>
                         </button>
                     </form>
@@ -64,7 +64,7 @@
                 <div class="message-text">{{ msg.tresc }}</div>
                 {% endif %}
                 {% if msg.obrazek %}
-                <div class="mt-1"><img src="{{ msg.obrazek.url }}" class="chat-image"></div>
+                <div class="mt-1"><img src="{{ msg.obrazek.url }}" class="chat-image" alt="Załączony obraz"></div>
                 {% endif %}
                 {% if msg.audio %}
                 <div class="mt-1"><audio controls src="{{ msg.audio.url }}"></audio></div>
@@ -77,13 +77,13 @@
                         <input type="hidden" name="next" value="{% url 'chat:channel' channel_id=channel.id %}">
                         <button type="submit" name="emoji" value="{{ r.emoji }}"
                                 class="reaction-badge {% if r.mine %}reaction-mine{% endif %}"
-                                title="{% if r.mine %}Kliknij aby usunac{% else %}Kliknij aby dodac{% endif %}">
+                                title="{% if r.mine %}Kliknij, aby usunąć swoją reakcję{% else %}Kliknij, aby dodać tę reakcję{% endif %}">
                             {{ r.emoji }} <span class="reaction-count">{{ r.count }}</span>
                         </button>
                     </form>
                     {% endfor %}
                     <div class="dropdown d-inline">
-                        <button class="btn btn-sm text-muted p-0 ms-1" type="button" data-bs-toggle="dropdown" title="Dodaj reakcje">
+                        <button class="btn btn-sm text-muted p-0 ms-1" type="button" data-bs-toggle="dropdown" title="Dodaj reakcję" aria-label="Dodaj reakcję">
                             <i class="bi bi-emoji-smile"></i>
                         </button>
                         <div class="dropdown-menu emoji-picker">
@@ -105,30 +105,30 @@
             <form method="post" enctype="multipart/form-data" class="d-flex gap-2 align-items-center w-100" id="message-form">
                 {% csrf_token %}
                 <input type="text" name="tresc" class="form-control" id="message-input"
-                       placeholder="Napisz wiadomosc na #{{ channel.nazwa }}..." autocomplete="off">
-                <label class="btn btn-outline-secondary btn-sm" title="Dodaj obrazek">
+                       placeholder="Napisz wiadomość na #{{ channel.nazwa }}…" autocomplete="off">
+                <label class="btn btn-outline-secondary btn-sm" title="Dodaj obraz">
                     <i class="bi bi-image"></i>
                     <input type="file" name="obrazek" accept="image/*" hidden onchange="this.form.submit()">
                 </label>
-                <label class="btn btn-outline-secondary btn-sm" title="Dodaj audio">
+                <label class="btn btn-outline-secondary btn-sm" title="Dodaj nagranie audio">
                     <i class="bi bi-mic"></i>
                     <input type="file" name="audio" accept="audio/*" hidden onchange="this.form.submit()">
                 </label>
-                <button type="submit" class="btn btn-primary btn-sm"><i class="bi bi-send"></i></button>
+                <button type="submit" class="btn btn-primary btn-sm" title="Wyślij"><i class="bi bi-send"></i></button>
             </form>
         </div>
     </div>
 
     <div class="members-sidebar">
-        <h6 class="p-3 mb-0">Czlonkowie - {{ members.count }}</h6>
+        <h6 class="p-3 mb-0">Członkowie — {{ members.count }}</h6>
         {% if can_add_members %}
             {% if addable_users %}
             <form method="post" action="{% url 'chat:add_channel_member' channel_id=channel.id %}" class="px-3 pb-3 border-bottom">
                 {% csrf_token %}
-                <label class="form-label small text-muted mb-1">Dodaj uzytkownika</label>
+                <label class="form-label small text-muted mb-1">Dodaj użytkownika</label>
                 <div class="input-group input-group-sm">
                     <select name="user_id" class="form-select form-select-sm" required>
-                        <option value="" disabled selected>-- wybierz --</option>
+                        <option value="" disabled selected>— wybierz —</option>
                         {% for u in addable_users %}
                         <option value="{{ u.id }}">{{ u.username }}</option>
                         {% endfor %}
@@ -137,7 +137,7 @@
                 </div>
             </form>
             {% else %}
-            <p class="small text-muted px-3 pb-3 border-bottom mb-0">Wszyscy uzytkownicy sa juz na tym kanale.</p>
+            <p class="small text-muted px-3 pb-3 border-bottom mb-0">Wszyscy użytkownicy są już na tym kanale.</p>
             {% endif %}
         {% endif %}
         {% for m in members %}
@@ -147,9 +147,9 @@
                 {{ m.user.username }}
             </span>
             {% if m.user.profile.role == 'admin' %}
-            <span class="role-tag role-tag-admin ms-auto">ADMIN</span>
+            <span class="role-tag role-tag-admin ms-auto">Administrator</span>
             {% elif m.user.profile.role == 'moderator' %}
-            <span class="role-tag role-tag-mod ms-auto">MOD</span>
+            <span class="role-tag role-tag-mod ms-auto">Moderator</span>
             {% endif %}
         </a>
         {% endfor %}
@@ -210,7 +210,7 @@
         }
     });
 
-    // scroll to bottom on load
+    /* przewiń na dół po wczytaniu */
     const chatMessages = document.getElementById('chat-messages');
     chatMessages.scrollTop = chatMessages.scrollHeight;
 

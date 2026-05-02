@@ -1,5 +1,5 @@
 {% extends 'chat/base.html' %}
-{% block title %}Edytuj profil - Django Discord{% endblock %}
+{% block title %}Edycja profilu — Django Discord{% endblock %}
 
 {% block content %}
 <div class="app-container">
@@ -7,26 +7,35 @@
 
     <div class="main-content">
         <div class="top-bar">
-            <h5><i class="bi bi-pencil"></i> Edytuj profil</h5>
+            <h5><i class="bi bi-pencil"></i> Edycja profilu</h5>
         </div>
 
         <div class="content-area p-4">
             <div class="card p-4" style="max-width: 500px; margin: 0 auto;">
                 <form method="post" enctype="multipart/form-data">
                     {% csrf_token %}
+                    {% if form.non_field_errors %}
+                    <div class="alert alert-danger">{{ form.non_field_errors }}</div>
+                    {% endif %}
                     <div class="mb-3">
-                        <label class="form-label">Avatar</label>
+                        <label class="form-label" for="{{ form.avatar.id_for_label }}">{{ form.avatar.label }}</label>
                         {{ form.avatar }}
+                        {% if form.avatar.errors %}
+                        <div class="text-danger small mt-1">{% for e in form.avatar.errors %}{{ e }}{% endfor %}</div>
+                        {% endif %}
                         {% if request.user.profile.avatar %}
                         <div class="mt-2">
-                            <img src="{{ request.user.profile.avatar.url }}" class="avatar-small">
-                            <span class="small text-muted ms-2">Obecny avatar</span>
+                            <img src="{{ request.user.profile.avatar.url }}" class="avatar-small" alt="">
+                            <span class="small text-muted ms-2">Obecny awatar</span>
                         </div>
                         {% endif %}
                     </div>
                     <div class="mb-3">
-                        <label class="form-label">Opis</label>
-                        <textarea name="opis" class="form-control" rows="3">{{ form.opis.value|default:'' }}</textarea>
+                        <label class="form-label" for="{{ form.opis.id_for_label }}">{{ form.opis.label }}</label>
+                        {{ form.opis }}
+                        {% if form.opis.errors %}
+                        <div class="text-danger small mt-1">{% for e in form.opis.errors %}{{ e }}{% endfor %}</div>
+                        {% endif %}
                     </div>
                     <button type="submit" class="btn btn-primary">Zapisz zmiany</button>
                     <a href="{% url 'chat:profile' user_id=request.user.id %}" class="btn btn-secondary ms-2">Anuluj</a>

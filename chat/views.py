@@ -12,6 +12,21 @@ from .models import Profile, Channel, ChannelMember, Message, Reaction
 from .forms import RegisterForm, ProfileForm, ChannelForm, MessageForm
 
 
+def _flash_form_errors(request, form):
+    """Dodaje komunikaty Django forms jako wiadomości flash (po polsku)."""
+    if not getattr(form, "errors", None):
+        return
+    for err in form.non_field_errors():
+        messages.error(request, err)
+    for field_name, error_list in form.errors.items():
+        if field_name == "__all__":
+            continue
+        field = form.fields.get(field_name)
+        label = field.label if field and field.label else field_name
+        for err in error_list:
+            messages.error(request, f"{label}: {err}")
+
+
 def register_view(request):
     if request.method == 'POST':
         form = RegisterForm(request.POST)
@@ -21,7 +36,7 @@ def register_view(request):
             except IntegrityError:
                 form.add_error(
                     "email",
-                    "Ten adres email jest juz zarejestrowany.",
+                    "Ten adres e-mail jest już zarejestrowany.",
                 )
             else:
                 profile, _ = Profile.objects.get_or_create(user=user)
@@ -44,7 +59,7 @@ def login_view(request):
             if not user.is_active:
                 messages.error(
                     request,
-                    'To konto zostalo zablokowane przez administratora. Logowanie jest niemozliwe.',
+                    "To konto zostało zablokowane przez administratora. Logowanie jest niemożliwe.",
                 )
                 return render(request, 'chat/login.html')
             login(request, user)
@@ -62,10 +77,10 @@ def login_view(request):
         ):
             messages.error(
                 request,
-                'To konto zostalo zablokowane przez administratora. Logowanie jest niemozliwe.',
+                "To konto zostało zablokowane przez administratora. Logowanie jest niemożliwe.",
             )
         else:
-            messages.error(request, 'Nieprawidlowy login lub haslo.')
+            messages.error(request, "Nieprawidłowa nazwa użytkownika lub hasło.")
     return render(request, 'chat/login.html')
 
 
@@ -109,8 +124,9 @@ def edit_profile(request):
         form = ProfileForm(request.POST, request.FILES, instance=profile)
         if form.is_valid():
             form.save()
-            messages.success(request, 'Profil zaktualizowany!')
+            messages.success(request, "Profil został zaktualizowany.")
             return redirect('chat:profile', user_id=request.user.id)
+        _flash_form_errors(request, form)
     else:
         form = ProfileForm(instance=profile)
     all_channels = Channel.objects.filter(members__user=request.user)
@@ -130,6 +146,7 @@ def create_channel(request):
             channel.save()
             ChannelMember.objects.create(user=request.user, channel=channel)
             return redirect('chat:channel', channel_id=channel.id)
+        _flash_form_errors(request, form)
     else:
         form = ChannelForm()
     all_channels = Channel.objects.filter(members__user=request.user)
@@ -158,6 +175,7 @@ def channel_view(request, channel_id):
 
             notify_channel_message_saved(msg)
             return redirect('chat:channel', channel_id=channel.id)
+        _flash_form_errors(request, form)
 
     wiadomosci = Message.objects.filter(channel=channel).select_related('autor', 'autor__profile')
     members = ChannelMember.objects.filter(channel=channel).select_related('user', 'user__profile')
@@ -211,28 +229,28 @@ def join_channel(request, channel_id):
 def add_channel_member(request, channel_id):
     channel = get_object_or_404(Channel, pk=channel_id)
     if not ChannelMember.objects.filter(user=request.user, channel=channel).exists():
-        messages.error(request, 'Brak dostepu do kanalu.')
+        messages.error(request, "Brak dostępu do kanału.")
         return redirect('chat:home')
     if request.user != channel.tworca and not _is_admin(request.user):
-        messages.error(request, 'Brak uprawnien do dodawania czlonkow.')
+        messages.error(request, "Brak uprawnień do dodawania członków.")
         return redirect('chat:channel', channel_id=channel.id)
 
     raw_id = request.POST.get('user_id', '').strip()
     if not raw_id:
-        messages.error(request, 'Wybierz uzytkownika.')
+        messages.error(request, "Wybierz użytkownika.")
         return redirect('chat:channel', channel_id=channel.id)
     try:
         target = User.objects.get(pk=int(raw_id))
     except (ValueError, User.DoesNotExist):
-        messages.error(request, 'Nieprawidlowy uzytkownik.')
+        messages.error(request, "Nieprawidłowy użytkownik.")
         return redirect('chat:channel', channel_id=channel.id)
 
     if ChannelMember.objects.filter(user=target, channel=channel).exists():
-        messages.info(request, 'Ten uzytkownik jest juz na tym kanale.')
+        messages.info(request, "Ten użytkownik jest już na tym kanale.")
         return redirect('chat:channel', channel_id=channel.id)
 
     ChannelMember.objects.create(user=target, channel=channel)
-    messages.success(request, f'Dodano {target.username} do kanalu.')
+    messages.success(request, f"Dodano użytkownika „{target.username}” do kanału.")
     return redirect('chat:channel', channel_id=channel.id)
 
 
@@ -241,9 +259,9 @@ def delete_channel(request, channel_id):
     channel = get_object_or_404(Channel, pk=channel_id)
     if request.user == channel.tworca or _is_admin(request.user):
         channel.delete()
-        messages.success(request, 'Kanal usuniety.')
+        messages.success(request, "Kanał został usunięty.")
     else:
-        messages.error(request, 'Brak uprawnien do usuniecia kanalu.')
+        messages.error(request, "Brak uprawnień do usunięcia kanału.")
     return redirect('chat:home')
 
 
@@ -277,6 +295,7 @@ def dm_view(request, user_id):
 
             notify_dm_message_saved(msg)
             return redirect('chat:dm', user_id=other_user.id)
+        _flash_form_errors(request, form)
 
     wiadomosci = Message.objects.filter(
         Q(autor=request.user, odbiorca=other_user) |
@@ -304,7 +323,7 @@ def delete_message(request, message_id):
     if request.user == msg.autor or _is_moderator_or_admin(request.user):
         redirect_url = request.POST.get('next', '/')
         msg.delete()
-        messages.success(request, 'Wiadomosc usunieta.')
+        messages.success(request, "Wiadomość została usunięta.")
         return redirect(redirect_url)
     return redirect('chat:home')
 
@@ -331,7 +350,7 @@ def _is_admin(user):
 @login_required
 def change_role(request, user_id):
     if not _is_admin(request.user):
-        messages.error(request, 'Brak uprawnien.')
+        messages.error(request, "Brak uprawnień.")
         return redirect('chat:home')
 
     target = get_object_or_404(User, pk=user_id)
@@ -340,7 +359,10 @@ def change_role(request, user_id):
     if new_role in ('admin', 'moderator', 'user'):
         target_profile.role = new_role
         target_profile.save()
-        messages.success(request, f'Rola zmieniona na {new_role}.')
+        messages.success(
+            request,
+            f"Rola użytkownika {target.username} została ustawiona na: {target_profile.get_role_display()}.",
+        )
     return redirect('chat:profile', user_id=user_id)
 
 
@@ -409,7 +431,7 @@ def search_api(request):
 def leave_channel(request, channel_id):
     channel = get_object_or_404(Channel, pk=channel_id)
     ChannelMember.objects.filter(user=request.user, channel=channel).delete()
-    messages.success(request, f'Opuszczono kanal {channel.nazwa}.')
+    messages.success(request, f"Opuściłeś kanał „{channel.nazwa}”.")
     return redirect('chat:home')
 
 
@@ -426,14 +448,14 @@ def admin_toggle_user_active(request, user_id):
     if request.method != 'POST':
         return redirect('chat:admin_users')
     if not _is_admin(request.user):
-        messages.error(request, 'Brak uprawnien.')
+        messages.error(request, "Brak uprawnień.")
         return redirect('chat:home')
     if user_id == request.user.id:
-        messages.error(request, 'Nie mozesz wylaczyc wlasnego konta w ten sposob.')
+        messages.error(request, "Nie możesz wyłączyć własnego konta w ten sposób.")
         return redirect('chat:admin_users')
     target = get_object_or_404(User, pk=user_id)
     if target.is_superuser and not request.user.is_superuser:
-        messages.error(request, 'Brak uprawnien do zmiany tego konta.')
+        messages.error(request, "Brak uprawnień do zmiany tego konta.")
         return redirect('chat:admin_users')
     action = (request.POST.get('action') or '').strip()
     if action == 'deactivate':
@@ -441,21 +463,21 @@ def admin_toggle_user_active(request, user_id):
         target.save(update_fields=['is_active'])
         messages.success(
             request,
-            f'Konto {target.username} zostalo zablokowane — uzytkownik nie moze sie zalogowac.',
+            f"Konto „{target.username}” zostało zablokowane — użytkownik nie może się zalogować.",
         )
     elif action == 'activate':
         target.is_active = True
         target.save(update_fields=['is_active'])
-        messages.success(request, f'Konto {target.username} zostalo odblokowane.')
+        messages.success(request, f"Konto „{target.username}” zostało odblokowane.")
     else:
-        messages.error(request, 'Nieprawidlowa akcja.')
+        messages.error(request, "Nieprawidłowa akcja.")
     return redirect('chat:admin_users')
 
 
 @login_required
 def admin_users(request):
     if not _is_admin(request.user):
-        messages.error(request, 'Brak uprawnien.')
+        messages.error(request, "Brak uprawnień.")
         return redirect('chat:home')
 
     users = User.objects.select_related('profile').all()

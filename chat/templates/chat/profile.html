@@ -1,5 +1,5 @@
 {% extends 'chat/base.html' %}
-{% block title %}{{ viewed_user.username }} - Django Discord{% endblock %}
+{% block title %}{{ viewed_user.username }} — profil — Django Discord{% endblock %}
 
 {% block content %}
 {% if viewed_user == request.user and profile.appears_online %}
@@ -22,7 +22,7 @@
 
             <div class="card p-4 text-center" style="max-width: 500px; margin: 0 auto;">
                 {% if profile.avatar %}
-                <img src="{{ profile.avatar.url }}" class="avatar-large mb-3 mx-auto">
+                <img src="{{ profile.avatar.url }}" class="avatar-large mb-3 mx-auto" alt="Awatar użytkownika {{ viewed_user.username }}">
                 {% else %}
                 <div class="avatar-placeholder-large mb-3 mx-auto">
                     {{ viewed_user.username|first|upper }}
@@ -37,16 +37,16 @@
                    data-presence-poll-url="{% url 'chat:presence_status' user_id=viewed_user.id %}"
                    data-viewer-is-subject="{% if viewed_user == request.user %}1{% else %}0{% endif %}">
                     <span class="status-dot {% if profile.appears_online %}online{% else %}offline{% endif %}"></span>
-                    <span class="status-label">{% if profile.appears_online %}Online{% else %}Offline{% endif %}</span>
+                    <span class="status-label">{% if profile.appears_online %}Dostępny{% else %}Niedostępny{% endif %}</span>
                 </p>
 
                 <hr class="my-3">
                 <div class="text-start small mx-auto" style="max-width: 340px;">
                     <dl class="row mb-0">
-                        <dt class="col-sm-4 text-muted">Rejestracja</dt>
+                        <dt class="col-sm-4 text-muted">Data rejestracji</dt>
                         <dd class="col-sm-8">{{ viewed_user.date_joined|date:"d.m.Y, H:i" }}</dd>
                         {% if viewed_user == request.user or request.user.profile.role == 'admin' or request.user.is_superuser %}
-                        <dt class="col-sm-4 text-muted">Email</dt>
+                        <dt class="col-sm-4 text-muted">E-mail</dt>
                         <dd class="col-sm-8">
                             {% if viewed_user.email %}
                             <a href="mailto:{{ viewed_user.email }}">{{ viewed_user.email }}</a>
@@ -63,7 +63,7 @@
                 </div>
 
                 {% if profile.opis %}
-                <p>{{ profile.opis }}</p>
+                <p class="mt-3">{{ profile.opis }}</p>
                 {% endif %}
 
                 {% if viewed_user == request.user %}
@@ -71,28 +71,28 @@
                     <a href="{% url 'chat:edit_profile' %}" class="btn btn-primary btn-sm">
                         <i class="bi bi-pencil"></i> Edytuj profil
                     </a>
-                    <a href="{% url 'chat:logout' %}" class="btn btn-outline-danger btn-sm d-inline-flex d-lg-none align-items-center gap-1" title="Wyloguj">
-                        <i class="bi bi-box-arrow-right" aria-hidden="true"></i> Wyloguj
+                    <a href="{% url 'chat:logout' %}" class="btn btn-outline-danger btn-sm d-inline-flex d-lg-none align-items-center gap-1" title="Wyloguj się">
+                        <i class="bi bi-box-arrow-right" aria-hidden="true"></i> Wyloguj się
                     </a>
                 </div>
                 {% else %}
                 <div class="mt-3 d-flex justify-content-center gap-2 flex-wrap">
                     <a href="{% url 'chat:dm' user_id=viewed_user.id %}" class="btn btn-primary btn-sm">
-                        <i class="bi bi-chat"></i> Wyslij wiadomosc
+                        <i class="bi bi-chat"></i> Wyślij wiadomość
                     </a>
                 </div>
 
                 {% if request.user.profile.role == 'admin' or request.user.is_superuser %}
                 <div class="mt-3">
-                    <h6>Zmien role</h6>
-                    <form method="post" action="{% url 'chat:change_role' user_id=viewed_user.id %}" class="d-inline-flex gap-2">
+                    <h6 class="text-start">Zmiana roli</h6>
+                    <form method="post" action="{% url 'chat:change_role' user_id=viewed_user.id %}" class="d-inline-flex gap-2 flex-wrap">
                         {% csrf_token %}
-                        <select name="role" class="form-select form-select-sm" style="width: auto;">
-                            <option value="user" {% if profile.role == 'user' %}selected{% endif %}>Uzytkownik</option>
+                        <select name="role" class="form-select form-select-sm" style="width: auto;" aria-label="Nowa rola użytkownika">
+                            <option value="user" {% if profile.role == 'user' %}selected{% endif %}>Użytkownik</option>
                             <option value="moderator" {% if profile.role == 'moderator' %}selected{% endif %}>Moderator</option>
                             <option value="admin" {% if profile.role == 'admin' %}selected{% endif %}>Administrator</option>
                         </select>
-                        <button class="btn btn-sm btn-warning">Zapisz</button>
+                        <button type="submit" class="btn btn-sm btn-warning">Zapisz rolę</button>
                     </form>
                 </div>
                 {% endif %}

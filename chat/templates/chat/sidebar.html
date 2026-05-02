@@ -1,6 +1,6 @@
 <input type="checkbox" id="app-sidebar-drawer" class="app-sidebar-drawer-state" autocomplete="off">
 <label class="app-sidebar-backdrop" for="app-sidebar-drawer" aria-hidden="true"></label>
-<aside class="sidebar app-sidebar-panel" id="app-sidebar" aria-label="Nawigacja">
+<aside class="sidebar app-sidebar-panel" id="app-sidebar" aria-label="Menu nawigacji">
     <div class="sidebar-header">
         <h5 class="mb-0 flex-grow-1 min-w-0">
             <a href="{% url 'chat:home' %}" class="sidebar-brand-title d-inline-block text-truncate">Django Discord</a>
@@ -12,8 +12,8 @@
     </div>
 
     <div class="sidebar-section sidebar-quick-nav">
-        <a href="{% url 'chat:home' %}" class="sidebar-link" title="Wyszukiwarka jest na gorze strony">
-            <i class="bi bi-house-door" aria-hidden="true"></i> <span class="sidebar-link-text">Strona glowna</span>
+        <a href="{% url 'chat:home' %}" class="sidebar-link" title="Wyszukiwarka jest u góry strony">
+            <i class="bi bi-house-door" aria-hidden="true"></i> <span class="sidebar-link-text">Strona główna</span>
         </a>
         <a href="{% url 'chat:notifications_settings' %}" class="sidebar-notifications-link">
             <i class="bi bi-bell-fill" aria-hidden="true"></i>
@@ -23,8 +23,8 @@
 
     <div class="sidebar-section">
         <div class="sidebar-title">
-            <span class="sidebar-title-text">KANALY TEKSTOWE</span>
-            <a href="{% url 'chat:create_channel' %}" class="btn btn-sm text-primary" title="Nowy kanal">+</a>
+            <span class="sidebar-title-text">Kanały tekstowe</span>
+            <a href="{% url 'chat:create_channel' %}" class="btn btn-sm text-primary" title="Nowy kanał">+</a>
         </div>
         {% for ch in all_channels %}
         <a href="{% url 'chat:channel' channel_id=ch.id %}" class="sidebar-link" title="{{ ch.nazwa }}">
@@ -34,17 +34,17 @@
     </div>
 
     <div class="sidebar-section">
-        <div class="sidebar-title"><span class="sidebar-title-text">WIADOMOSCI PRYWATNE</span></div>
+        <div class="sidebar-title"><span class="sidebar-title-text">Wiadomości prywatne</span></div>
         <a href="{% url 'chat:dm_list' %}" class="sidebar-link">
-            <i class="bi bi-chat-dots" aria-hidden="true"></i> <span class="sidebar-link-text">Lista rozmow</span>
+            <i class="bi bi-chat-dots" aria-hidden="true"></i> <span class="sidebar-link-text">Lista rozmów</span>
         </a>
     </div>
 
     {% if request.user.profile.role == 'admin' or request.user.is_superuser %}
     <div class="sidebar-section">
-        <div class="sidebar-title"><span class="sidebar-title-text">ADMINISTRACJA</span></div>
+        <div class="sidebar-title"><span class="sidebar-title-text">Administracja</span></div>
         <a href="{% url 'chat:admin_users' %}" class="sidebar-link">
-            <i class="bi bi-shield-lock" aria-hidden="true"></i> <span class="sidebar-link-text">Panel admina</span>
+            <i class="bi bi-shield-lock" aria-hidden="true"></i> <span class="sidebar-link-text">Panel administratora</span>
         </a>
     </div>
     {% endif %}
@@ -65,12 +65,12 @@
                 </span>
             </div>
         </a>
-        <a href="{% url 'chat:logout' %}" class="btn btn-outline-danger btn-sm flex-shrink-0 mt-2 sidebar-logout-btn" title="Wyloguj">
-            <i class="bi bi-box-arrow-right" aria-hidden="true"></i><span class="sidebar-logout-label ms-1">Wyloguj</span>
+        <a href="{% url 'chat:logout' %}" class="btn btn-outline-danger btn-sm flex-shrink-0 mt-2 sidebar-logout-btn" title="Wyloguj się">
+            <i class="bi bi-box-arrow-right" aria-hidden="true"></i><span class="sidebar-logout-label ms-1">Wyloguj się</span>
         </a>
     </div>
 </aside>
-<label class="app-sidebar-open-fab" for="app-sidebar-drawer" title="Menu nawigacji">
-    <span class="visually-hidden">Otworz menu nawigacji</span>
+<label class="app-sidebar-open-fab" for="app-sidebar-drawer" title="Otwórz menu nawigacji">
+    <span class="visually-hidden">Otwórz menu nawigacji</span>
     <i class="bi bi-list" aria-hidden="true"></i>
 </label>

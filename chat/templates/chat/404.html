@@ -1,13 +1,34 @@
 {% extends 'chat/base.html' %}
-{% block title %}404 - Nie znaleziono{% endblock %}
+{% block title %}Strona nie znaleziona (404) — Django Discord{% endblock %}
 
 {% block content %}
-<div class="d-flex justify-content-center align-items-center" style="min-height: 100vh;">
-    <div class="card shadow-sm text-center p-5">
-        <h1 style="font-size: 5rem;">404</h1>
-        <h3>Strona nie znaleziona</h3>
-        <p class="text-muted">Ups! Strona ktorej szukasz nie istnieje.</p>
-        <a href="/" class="btn btn-primary mt-3">Wroc na strone glowna</a>
+<div class="error-page-404 d-flex flex-column min-vh-100">
+    <div class="flex-grow-1 d-flex align-items-center justify-content-center px-3 py-5">
+        <div class="text-center" style="max-width: 520px;">
+            <p class="text-uppercase small text-muted letter-spacing mb-2">Błąd 404</p>
+            <h1 class="display-3 fw-bold text-primary mb-3" style="letter-spacing: -0.02em;">Zabłądziliśmy?</h1>
+            <p class="lead text-secondary mb-4">
+                Ta strona nie istnieje lub została przeniesiona. Sprawdź adres w pasku przeglądarki
+                albo wróć do czatu.
+            </p>
+            <div class="d-flex flex-wrap justify-content-center gap-2">
+                <a href="/" class="btn btn-primary btn-lg px-4">
+                    <i class="bi bi-house-door me-2"></i>Strona główna
+                </a>
+                {% if user.is_authenticated and user.is_active %}
+                <a href="{% url 'chat:dm_list' %}" class="btn btn-outline-secondary btn-lg px-4">
+                    <i class="bi bi-chat-dots me-2"></i>Wiadomości prywatne
+                </a>
+                {% else %}
+                <a href="{% url 'chat:login' %}" class="btn btn-outline-secondary btn-lg px-4">
+                    <i class="bi bi-box-arrow-in-right me-2"></i>Logowanie
+                </a>
+                {% endif %}
+            </div>
+        </div>
     </div>
+    <footer class="text-center small text-muted py-3 border-top bg-light">
+        Django Discord — jeśli uważasz, że to błąd aplikacji, daj znać administratorowi.
+    </footer>
 </div>
 {% endblock %}

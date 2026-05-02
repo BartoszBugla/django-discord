@@ -10,7 +10,7 @@ HEARTBEAT_ONLINE_SECONDS = 30
 ROLE_CHOICES = [
     ("admin", "Administrator"),
     ("moderator", "Moderator"),
-    ("user", "Uzytkownik"),
+    ("user", "Użytkownik"),
 ]
 
 
