@@ -19,6 +19,9 @@
             channelId: null,
             dmUserId: null
         };
+        window.__notificationMarkReadUrl = function (id) {
+            return "{% url 'chat:notification_mark_read' pk=888888888 %}".replace("888888888", String(id));
+        };
     </script>
     <script src="{% static 'chat/js/presence.js' %}"></script>
     <script src="{% static 'chat/js/notifications.js' %}"></script>

@@ -16,6 +16,9 @@ python manage.py collectstatic --noinput
 echo "==> ensure_admin_user (pomija, jeśli brak ADMIN_PASSWORD)"
 python manage.py ensure_admin_user
 
+echo "==> purge_read_notifications (stare przeczytane in-app)"
+python manage.py purge_read_notifications
+
 PORT="${PORT:-8000}"
 BIND="${BIND:-0.0.0.0:${PORT}}"
 

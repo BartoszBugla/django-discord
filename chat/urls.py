@@ -22,6 +22,11 @@ urlpatterns = [
     path('wiadomosc/<int:message_id>/usun/', views.delete_message, name='delete_message'),
     path('wiadomosc/<int:message_id>/reakcja/', views.add_reaction, name='add_reaction'),
     path('uzytkownik/<int:user_id>/rola/', views.change_role, name='change_role'),
+    path(
+        'powiadomienia/odczytaj/<int:pk>/',
+        views.notification_mark_read,
+        name='notification_mark_read',
+    ),
     path('powiadomienia/', views.notifications_settings, name='notifications_settings'),
     path('szukaj/', views.search_view, name='search'),
     path('api/szukaj/', views.search_api, name='search_api'),

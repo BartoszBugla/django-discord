@@ -53,6 +53,37 @@
         return true;
     }
 
+    function getCsrfToken() {
+        var name = "csrftoken";
+        var parts = document.cookie.split(";");
+        for (var i = 0; i < parts.length; i++) {
+            var c = parts[i].trim();
+            if (c.indexOf(name + "=") === 0) {
+                return decodeURIComponent(c.substring(name.length + 1));
+            }
+        }
+        return "";
+    }
+
+    function markNotificationRead(notificationId) {
+        if (notificationId == null || notificationId === "") {
+            return Promise.resolve();
+        }
+        var urlFn = window.__notificationMarkReadUrl;
+        var u =
+            typeof urlFn === "function"
+                ? urlFn(notificationId)
+                : "/powiadomienia/odczytaj/" + encodeURIComponent(String(notificationId)) + "/";
+        return fetch(u, {
+            method: "POST",
+            credentials: "same-origin",
+            headers: {
+                "X-CSRFToken": getCsrfToken(),
+                "X-Requested-With": "XMLHttpRequest",
+            },
+        }).catch(function () {});
+    }
+
     function truncate(s, n) {
         if (!s) {
             return "";
@@ -89,7 +120,7 @@
         return stack;
     }
 
-    function showInAppToast(title, body, url) {
+    function showInAppToast(title, body, url, notificationId) {
         var stack = ensureToastStack();
         while (stack.children.length >= MAX_TOASTS) {
             stack.removeChild(stack.firstChild);
@@ -107,7 +138,9 @@
         closeBtn.textContent = "\u00D7";
         closeBtn.addEventListener("click", function (e) {
             e.stopPropagation();
-            removeToast(wrap);
+            markNotificationRead(notificationId).finally(function () {
+                removeToast(wrap);
+            });
         });
 
         var inner = document.createElement("div");
@@ -131,16 +164,20 @@
         inner.appendChild(bodyEl);
 
         inner.addEventListener("click", function () {
-            if (url) {
-                window.location.href = url;
-            }
+            markNotificationRead(notificationId).finally(function () {
+                if (url) {
+                    window.location.href = url;
+                }
+            });
         });
         inner.addEventListener("keydown", function (e) {
             if (e.key === "Enter" || e.key === " ") {
                 e.preventDefault();
-                if (url) {
-                    window.location.href = url;
-                }
+                markNotificationRead(notificationId).finally(function () {
+                    if (url) {
+                        window.location.href = url;
+                    }
+                });
             }
         });
 
@@ -204,7 +241,7 @@
             return;
         }
 
-        showInAppToast(title, body, url);
+        showInAppToast(title, body, url, data.notification_id);
 
         if (document.hidden || !document.hasFocus()) {
             bumpTitle();
@@ -240,12 +277,13 @@
 
     connectInbox();
 
-    /** Podgląd stylu toastów (strona ustawień / debug). */
+    /** Przykładowe powiadomienie (strona „Powiadomienia w aplikacji”). */
     window.__showAppNotificationDemo = function () {
         showInAppToast(
-            "Django Discord — test",
-            "Tak wyglądają powiadomienia w aplikacji (WebSocket /ws/inbox/, bez powiadomień systemowych przeglądarki).",
-            window.location.pathname || "/"
+            "Nowa wiadomość (przykład)",
+            "Anna: Hej, masz chwilę? Tak będzie wyglądać skrót, gdy ktoś napisze na innym kanale lub w innej rozmowie.",
+            window.location.pathname || "/",
+            null
         );
     };
 })();

@@ -103,3 +103,45 @@ class Reaction(models.Model):
 
     def __str__(self):
         return f"{self.user.username} -> {self.emoji}"
+
+
+class InAppNotification(models.Model):
+    """Powiadomienie w aplikacji (lista); po odczytaniu usuwane z bazy po kilku godzinach."""
+
+    KIND_CHANNEL = "channel"
+    KIND_DM = "dm"
+    KIND_CHOICES = [
+        (KIND_CHANNEL, "Kanał"),
+        (KIND_DM, "Wiadomość prywatna"),
+    ]
+
+    user = models.ForeignKey(
+        User, on_delete=models.CASCADE, related_name="in_app_notifications"
+    )
+    kind = models.CharField(max_length=20, choices=KIND_CHOICES)
+    title = models.CharField(max_length=200)
+    body = models.TextField(blank=True, default="")
+    url = models.CharField(max_length=500)
+    channel_id = models.PositiveIntegerField(null=True, blank=True)
+    dm_from_user_id = models.PositiveIntegerField(null=True, blank=True)
+    message_id = models.PositiveIntegerField(null=True, blank=True)
+    read_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["user", "-created_at"]),
+            models.Index(fields=["user", "read_at"]),
+        ]
+
+    def __str__(self):
+        return f"{self.user.username}: {self.title[:40]}"
+
+    def url_with_read_marker(self):
+        """Adres z parametrem nid (oznaczenie przeczytania po wejściu z listy)."""
+        if self.read_at:
+            return self.url
+        base, sep, frag = self.url.partition("#")
+        glue = "&" if "?" in base else "?"
+        return f"{base}{glue}nid={self.pk}{sep}{frag}"

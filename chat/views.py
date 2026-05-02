@@ -2,14 +2,17 @@ from django.contrib import messages
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import User
-from django.db import IntegrityError
+from django.db import IntegrityError, transaction
 from django.db.models import Q
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from django.utils.http import url_has_allowed_host_and_scheme
+from django.views.decorators.http import require_POST
 
-from .models import Profile, Channel, ChannelMember, Message, Reaction
+from .inbox_notify import purge_expired_read_inapp_notifications
+
+from .models import Profile, Channel, ChannelMember, Message, Reaction, InAppNotification
 from .forms import RegisterForm, ProfileForm, ChannelForm, MessageForm
 
 
@@ -32,18 +35,26 @@ def register_view(request):
     if request.method == 'POST':
         form = RegisterForm(request.POST)
         if form.is_valid():
+            user = None
             try:
-                user = form.save()
+                with transaction.atomic():
+                    user = form.save()
+                    profile, _ = Profile.objects.get_or_create(user=user)
+                    profile.is_online = True
+                    profile.last_seen_at = timezone.now()
+                    profile.save(update_fields=["is_online", "last_seen_at"])
             except IntegrityError:
+                # Równoległa rejestracja lub duplikat w bazie — transakcja wycofuje zapis użytkownika.
                 form.add_error(
-                    "email",
-                    "Ten adres e-mail jest już zarejestrowany.",
+                    None,
+                    (
+                        "Nie udało się utworzyć konta: ta nazwa użytkownika lub adres e-mail jest już "
+                        "zajęty (czasem tak bywa, gdy dwie karty wysyłają formularz jednocześnie). "
+                        "Spróbuj innych danych albo zaloguj się, jeśli masz już konto."
+                    ),
                 )
-            else:
-                profile, _ = Profile.objects.get_or_create(user=user)
-                profile.is_online = True
-                profile.last_seen_at = timezone.now()
-                profile.save(update_fields=["is_online", "last_seen_at"])
+                user = None
+            if user is not None:
                 login(request, user)
                 return redirect('chat:home')
     else:
@@ -167,6 +178,19 @@ def channel_view(request, channel_id):
     if not is_member:
         return redirect('chat:join_channel', channel_id=channel.id)
 
+    nid = (request.GET.get("nid") or "").strip()
+    if request.method == "GET" and nid.isdigit():
+        notif = InAppNotification.objects.filter(
+            pk=int(nid), user=request.user, channel_id=channel.id, read_at__isnull=True
+        ).first()
+        if notif:
+            notif.read_at = timezone.now()
+            notif.save(update_fields=["read_at"])
+            purge_expired_read_inapp_notifications()
+            if notif.message_id:
+                return redirect(f"/kanal/{channel.id}/#message-{notif.message_id}")
+            return redirect("chat:channel", channel_id=channel.id)
+
     if request.method == 'POST':
         form = MessageForm(request.POST, request.FILES)
         if form.is_valid():
@@ -286,6 +310,22 @@ def dm_list(request):
 @login_required
 def dm_view(request, user_id):
     other_user = get_object_or_404(User, pk=user_id)
+
+    nid = (request.GET.get("nid") or "").strip()
+    if request.method == "GET" and nid.isdigit():
+        notif = InAppNotification.objects.filter(
+            pk=int(nid),
+            user=request.user,
+            dm_from_user_id=other_user.id,
+            read_at__isnull=True,
+        ).first()
+        if notif:
+            notif.read_at = timezone.now()
+            notif.save(update_fields=["read_at"])
+            purge_expired_read_inapp_notifications()
+            if notif.message_id:
+                return redirect(f"/dm/{other_user.id}/#message-{notif.message_id}")
+            return redirect("chat:dm", user_id=other_user.id)
 
     if request.method == 'POST':
         form = MessageForm(request.POST, request.FILES)
@@ -411,10 +451,43 @@ def change_role(request, user_id):
 
 @login_required
 def notifications_settings(request):
+    if request.method == "POST":
+        action = (request.POST.get("action") or "").strip()
+        if action == "mark_all_read":
+            InAppNotification.objects.filter(
+                user=request.user, read_at__isnull=True
+            ).update(read_at=timezone.now())
+            purge_expired_read_inapp_notifications()
+            messages.success(request, "Wszystkie powiadomienia oznaczono jako przeczytane.")
+            return redirect("chat:notifications_settings")
+
+    purge_expired_read_inapp_notifications()
+    notifications = list(
+        InAppNotification.objects.filter(user=request.user)[:80]
+    )
     all_channels = Channel.objects.filter(members__user=request.user)
-    return render(request, 'chat/notifications_settings.html', {
-        'all_channels': all_channels,
-    })
+    return render(
+        request,
+        "chat/notifications_settings.html",
+        {
+            "all_channels": all_channels,
+            "notifications": notifications,
+        },
+    )
+
+
+@login_required
+@require_POST
+def notification_mark_read(request, pk):
+    updated = InAppNotification.objects.filter(
+        pk=pk, user=request.user, read_at__isnull=True
+    ).update(read_at=timezone.now())
+    purge_expired_read_inapp_notifications()
+    if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+        return JsonResponse({"ok": True, "updated": bool(updated)})
+    if updated:
+        messages.success(request, "Powiadomienie oznaczono jako przeczytane.")
+    return redirect("chat:notifications_settings")
 
 
 @login_required

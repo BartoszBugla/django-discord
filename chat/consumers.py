@@ -1,5 +1,6 @@
 import json
 
+from asgiref.sync import sync_to_async
 from channels.db import database_sync_to_async
 from channels.generic.websocket import AsyncWebsocketConsumer
 from django.contrib.auth.models import User
@@ -13,37 +14,10 @@ def _strip_message(message):
 
 
 @database_sync_to_async
-def _channel_inbox_recipients(channel_id, sender_id):
-    from chat.models import ChannelMember
-
-    return list(
-        ChannelMember.objects.filter(channel_id=channel_id)
-        .exclude(user_id=sender_id)
-        .values_list("user_id", flat=True)
-    )
-
-
-@database_sync_to_async
-def _channel_name(channel_id):
-    from chat.models import Channel
-
-    return Channel.objects.filter(pk=channel_id).values_list("nazwa", flat=True).first() or ""
-
-
-@database_sync_to_async
 def _user_is_channel_member(user_id, channel_id):
     from chat.models import ChannelMember
 
     return ChannelMember.objects.filter(user_id=user_id, channel_id=channel_id).exists()
-
-
-@database_sync_to_async
-def _message_push_preview_by_id(message_id):
-    from chat.inbox_notify import message_push_preview
-    from chat.models import Message
-
-    m = Message.objects.get(pk=message_id)
-    return message_push_preview(m)
 
 
 class ChatConsumer(AsyncWebsocketConsumer):
@@ -97,22 +71,9 @@ class ChatConsumer(AsyncWebsocketConsumer):
             },
         )
 
-        ch_name = await _channel_name(self.channel_id)
-        preview = await _message_push_preview_by_id(msg.id)
-        recipient_ids = await _channel_inbox_recipients(self.channel_id, user.id)
-        inbox_payload = {
-            "kind": "channel",
-            "channel_id": self.channel_id,
-            "channel_name": ch_name,
-            "from_username": user.username,
-            "preview": preview,
-            "message_id": msg.id,
-        }
-        for uid in recipient_ids:
-            await self.channel_layer.group_send(
-                f"inbox_user_{uid}",
-                {"type": "inbox_notify", "data": inbox_payload},
-            )
+        from chat.inbox_notify import notify_channel_message_saved
+
+        await sync_to_async(notify_channel_message_saved, thread_sensitive=True)(msg)
 
     async def chat_message(self, event):
         if event["message"] is None:
@@ -190,18 +151,9 @@ class DMConsumer(AsyncWebsocketConsumer):
             },
         )
 
-        preview = await _message_push_preview_by_id(msg.id)
-        inbox_payload = {
-            "kind": "dm",
-            "from_user_id": user.id,
-            "from_username": user.username,
-            "preview": preview,
-            "message_id": msg.id,
-        }
-        await self.channel_layer.group_send(
-            f"inbox_user_{msg.odbiorca_id}",
-            {"type": "inbox_notify", "data": inbox_payload},
-        )
+        from chat.inbox_notify import notify_dm_message_saved
+
+        await sync_to_async(notify_dm_message_saved, thread_sensitive=True)(msg)
 
     async def chat_message(self, event):
         await self.send(

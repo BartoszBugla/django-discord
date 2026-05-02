@@ -3,8 +3,97 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import Client, TestCase
 from django.urls import reverse
 
-from chat.inbox_notify import message_push_preview
-from chat.models import Channel, ChannelMember, Message
+from datetime import timedelta
+
+from django.utils import timezone
+
+from chat.inbox_notify import message_push_preview, purge_expired_read_inapp_notifications
+from chat.models import Channel, ChannelMember, Message, InAppNotification
+
+
+class RegisterViewTests(TestCase):
+    def setUp(self):
+        self.client = Client()
+
+    def test_mismatched_passwords_does_not_create_user(self):
+        n = User.objects.count()
+        r = self.client.post(
+            reverse("chat:register"),
+            {
+                "username": "newu1",
+                "email": "newu1@example.com",
+                "password1": "verylongpass123",
+                "password2": "otherpass456",
+            },
+        )
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(User.objects.count(), n)
+        self.assertContains(r, "Hasła")
+
+    def test_duplicate_email_shows_error_not_logged_in(self):
+        User.objects.create_user(
+            username="existing", email="dup@example.com", password="x"
+        )
+        n = User.objects.count()
+        r = self.client.post(
+            reverse("chat:register"),
+            {
+                "username": "othername",
+                "email": "dup@example.com",
+                "password1": "longpassword123",
+                "password2": "longpassword123",
+            },
+        )
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(User.objects.count(), n)
+        self.assertContains(r, "e-mail")
+        self.assertFalse(r.wsgi_request.user.is_authenticated)
+
+    def test_valid_registration_creates_user_and_redirects(self):
+        r = self.client.post(
+            reverse("chat:register"),
+            {
+                "username": "brandnew",
+                "email": "brandnew@example.com",
+                "password1": "longpassword123",
+                "password2": "longpassword123",
+            },
+        )
+        self.assertEqual(r.status_code, 302)
+        self.assertTrue(User.objects.filter(username="brandnew").exists())
+
+
+class InAppNotificationTests(TestCase):
+    def setUp(self):
+        self.a = User.objects.create_user(username="na", password="x")
+        self.b = User.objects.create_user(username="nb", password="x")
+        self.ch = Channel.objects.create(nazwa="c1", opis="", tworca=self.a)
+        ChannelMember.objects.create(user=self.a, channel=self.ch)
+        ChannelMember.objects.create(user=self.b, channel=self.ch)
+
+    def test_notify_channel_creates_row_for_recipient(self):
+        from chat.inbox_notify import notify_channel_message_saved
+
+        msg = Message.objects.create(autor=self.a, channel=self.ch, tresc="hi")
+        notify_channel_message_saved(msg)
+        self.assertEqual(InAppNotification.objects.filter(user=self.b).count(), 1)
+        n = InAppNotification.objects.get(user=self.b)
+        self.assertEqual(n.kind, InAppNotification.KIND_CHANNEL)
+        self.assertIn("/kanal/", n.url)
+
+    def test_purge_removes_old_read_notifications(self):
+        old = timezone.now() - timedelta(hours=24)
+        InAppNotification.objects.create(
+            user=self.b,
+            kind=InAppNotification.KIND_DM,
+            title="t",
+            body="b",
+            url="/dm/1/",
+            read_at=old,
+        )
+        deleted_count = purge_expired_read_inapp_notifications()
+        self.assertGreaterEqual(deleted_count, 1)
+        self.assertEqual(InAppNotification.objects.filter(user=self.b).count(), 0)
 
 
 class NotificationsSettingsTests(TestCase):

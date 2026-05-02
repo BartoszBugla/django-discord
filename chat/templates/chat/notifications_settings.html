@@ -6,34 +6,76 @@
     {% include 'chat/sidebar.html' %}
 
     <div class="main-content">
-        <div class="top-bar">
-            <h5><i class="bi bi-bell"></i> Powiadomienia w aplikacji</h5>
+        <div class="top-bar d-flex flex-wrap align-items-center justify-content-between gap-2">
+            <h5 class="mb-0"><i class="bi bi-bell"></i> Powiadomienia w aplikacji</h5>
+            {% if notifications %}
+            <form method="post" class="m-0">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="mark_all_read">
+                <button type="submit" class="btn btn-sm btn-outline-secondary">Oznacz wszystkie jako przeczytane</button>
+            </form>
+            {% endif %}
         </div>
 
         <div class="content-area p-4">
-            <div class="notifications-settings-card card shadow-sm border-0 mx-auto" style="max-width: 520px;">
+            <div class="notifications-settings-card card shadow-sm border-0 mx-auto mb-4" style="max-width: 560px;">
                 <div class="card-body p-4">
                     <p class="text-muted mb-3">
-                        Nowe wiadomości na innych kanałach lub w innych rozmowach prywatnych pokazujemy jako
-                        <strong>powiadomienia w tej karcie</strong> (toast u góry ekranu). Działa to przez połączenie
-                        WebSocket <code class="small">/ws/inbox/</code> — bez zgody na powiadomienia systemowe
-                        przeglądarki i bez wyskakujących okien spoza aplikacji.
+                        Gdy ktoś napisze na <strong>innym kanale</strong> albo w <strong>innej rozmowie prywatnej</strong>,
+                        pojawi się krótkie przypomnienie u góry ekranu — i trafi tutaj na <strong>listę</strong>.
+                        Po wejściu w rozmowę powiadomienie oznaczamy jako przeczytane; po kilku godzinach znika z listy,
+                        żeby nie zaśmiecać widoku.
                     </p>
                     <p class="text-muted small mb-4">
-                        Gdy masz otwarty dokładnie ten kanał lub tę rozmowę i karta jest na pierwszym planie,
-                        nie pokazujemy duplikatu — nadal widzisz wiadomości na miejscu.
+                        Gdy właśnie oglądasz ten kanał lub tę rozmowę i ta karta jest aktywna, nie dostaniesz drugiego
+                        komunikatu — i tak widzisz wiadomości na bieżąco.
                     </p>
 
                     <div class="d-flex flex-wrap gap-2 mb-3">
                         <button type="button" class="btn btn-primary" id="notify-btn-demo">
-                            <i class="bi bi-easel me-1"></i> Pokaż przykładowe powiadomienie
+                            <i class="bi bi-bell me-1"></i> Zobacz, jak to wygląda
                         </button>
                     </div>
 
                     <p id="notify-hint" class="small text-muted mb-0">
-                        Jeśli po kliknięciu nie widać paska, upewnij się, że jesteś zalogowany i że skrypt powiadomień się wczytał.
+                        Kliknij przycisk powyżej — pojawi się przykład takiego samego powiadomienia jak przy prawdziwej wiadomości (bez zapisu na liście).
                     </p>
                 </div>
+            </div>
+
+            <div class="mx-auto" style="max-width: 560px;">
+                <h6 class="text-secondary text-uppercase small mb-3">Twoja lista</h6>
+                {% if notifications %}
+                <ul class="list-group list-group-flush shadow-sm rounded border">
+                    {% for n in notifications %}
+                    <li class="list-group-item d-flex flex-column flex-md-row gap-2 align-items-md-start justify-content-between {% if not n.read_at %}list-group-item-light{% endif %}">
+                        <div class="flex-grow-1 min-w-0">
+                            <div class="fw-semibold text-truncate">{{ n.title }}</div>
+                            <div class="small text-muted text-break">{{ n.body }}</div>
+                            <div class="small mt-1">
+                                <a href="{{ n.url_with_read_marker }}">Otwórz rozmowę</a>
+                                <span class="text-muted">· {{ n.created_at|date:"d.m.Y H:i" }}</span>
+                                {% if n.read_at %}
+                                <span class="text-muted">· przeczytane {{ n.read_at|date:"d.m.Y H:i" }}</span>
+                                {% endif %}
+                            </div>
+                        </div>
+                        <div class="flex-shrink-0">
+                            {% if not n.read_at %}
+                            <form method="post" action="{% url 'chat:notification_mark_read' pk=n.pk %}" class="d-inline">
+                                {% csrf_token %}
+                                <button type="submit" class="btn btn-sm btn-outline-primary">Przeczytane</button>
+                            </form>
+                            {% else %}
+                            <span class="badge bg-secondary align-self-center">Przeczytane</span>
+                            {% endif %}
+                        </div>
+                    </li>
+                    {% endfor %}
+                </ul>
+                {% else %}
+                <p class="text-muted small">Brak powiadomień — gdy coś się pojawi, zobaczysz je tutaj.</p>
+                {% endif %}
             </div>
         </div>
     </div>
@@ -49,9 +91,9 @@
         btn.addEventListener("click", function () {
             if (typeof window.__showAppNotificationDemo === "function") {
                 window.__showAppNotificationDemo();
-                hint.textContent = "Powinien pojawić się toast (in-app).";
+                hint.textContent = "To był tylko podgląd — prawdziwe wpisy pojawią się na liście poniżej po nowej wiadomości.";
             } else {
-                hint.textContent = "Brak funkcji podglądu — odśwież stronę (wymagane zalogowanie).";
+                hint.textContent = "Zaloguj się i odśwież stronę, żeby zobaczyć podgląd.";
             }
         });
     }
