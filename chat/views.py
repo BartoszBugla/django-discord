@@ -12,8 +12,16 @@ from django.views.decorators.http import require_POST
 
 from .inbox_notify import purge_expired_read_inapp_notifications
 
-from .models import Profile, Channel, ChannelMember, Message, Reaction, InAppNotification
-from .forms import RegisterForm, ProfileForm, ChannelForm, MessageForm
+from .models import (
+    Profile,
+    Channel,
+    ChannelMember,
+    Message,
+    Reaction,
+    InAppNotification,
+    UserReport,
+)
+from .forms import RegisterForm, ProfileForm, ChannelForm, MessageForm, UserReportForm
 
 
 def _flash_form_errors(request, form):
@@ -123,11 +131,15 @@ def profile_view(request, user_id):
     profile, _ = Profile.objects.get_or_create(user=viewed_user)
     all_channels = Channel.objects.filter(members__user=request.user)
     can_toggle_active = _may_toggle_user_active(request.user, viewed_user)
+    show_report_ui = viewed_user.pk != request.user.pk
+    report_form = UserReportForm() if show_report_ui else None
     return render(request, 'chat/profile.html', {
         'viewed_user': viewed_user,
         'profile': profile,
         'all_channels': all_channels,
         'can_toggle_active': can_toggle_active,
+        'show_report_ui': show_report_ui,
+        'report_form': report_form,
     })
 
 
@@ -354,12 +366,70 @@ def dm_view(request, user_id):
     })
 
 
+@login_required
+@require_POST
+def channel_message_media_upload(request, channel_id):
+    """Zapis pliku (obraz / audio) + broadcast na WS z samymi URL-ami mediów."""
+    channel = get_object_or_404(Channel, pk=channel_id)
+    if not ChannelMember.objects.filter(user=request.user, channel=channel).exists():
+        return JsonResponse({"ok": False, "error": "forbidden"}, status=403)
+    if not request.FILES.get("obrazek") and not request.FILES.get("audio"):
+        return JsonResponse({"ok": False, "error": "no_file"}, status=400)
+
+    form = MessageForm(request.POST, request.FILES)
+    if not form.is_valid():
+        return JsonResponse({"ok": False, "errors": form.errors}, status=400)
+
+    msg = form.save(commit=False)
+    msg.autor = request.user
+    msg.channel = channel
+    msg.save()
+
+    from chat.inbox_notify import notify_channel_message_saved
+    from chat.ws_broadcast import broadcast_chat_room_message, message_ws_payload
+
+    notify_channel_message_saved(msg)
+    broadcast_chat_room_message(msg)
+    return JsonResponse(
+        {"ok": True, "message_id": msg.id, "echo": message_ws_payload(msg)}
+    )
+
+
+@login_required
+@require_POST
+def dm_message_media_upload(request, user_id):
+    other_user = get_object_or_404(User, pk=user_id)
+    if other_user.id == request.user.id:
+        return JsonResponse({"ok": False, "error": "invalid"}, status=400)
+    if not request.FILES.get("obrazek") and not request.FILES.get("audio"):
+        return JsonResponse({"ok": False, "error": "no_file"}, status=400)
+
+    form = MessageForm(request.POST, request.FILES)
+    if not form.is_valid():
+        return JsonResponse({"ok": False, "errors": form.errors}, status=400)
+
+    msg = form.save(commit=False)
+    msg.autor = request.user
+    msg.odbiorca = other_user
+    msg.save()
+
+    from chat.inbox_notify import notify_dm_message_saved
+    from chat.ws_broadcast import broadcast_chat_room_message, message_ws_payload
+
+    notify_dm_message_saved(msg)
+    broadcast_chat_room_message(msg)
+    return JsonResponse(
+        {"ok": True, "message_id": msg.id, "echo": message_ws_payload(msg)}
+    )
+
+
 def _is_moderator_or_admin(user):
     profile, _ = Profile.objects.get_or_create(user=user)
     return profile.role in ('admin', 'moderator') or user.is_superuser
 
 
 @login_required
+@require_POST
 def delete_message(request, message_id):
     msg = get_object_or_404(Message, pk=message_id)
 
@@ -431,6 +501,52 @@ def _redirect_after_account_toggle(request):
 
 
 @login_required
+@require_POST
+def report_user(request, user_id):
+    """Zgłoszenie użytkownika — dostępne dla zalogowanych (nie wobec samego siebie)."""
+    target = get_object_or_404(User, pk=user_id)
+    if target.pk == request.user.pk:
+        messages.error(request, "Nie możesz zgłosić samego siebie.")
+        return redirect("chat:profile", user_id=user_id)
+    form = UserReportForm(request.POST)
+    if form.is_valid():
+        UserReport.objects.create(
+            reporter=request.user,
+            reported_user=target,
+            reason=form.cleaned_data["reason"].strip(),
+        )
+        messages.success(
+            request,
+            "Zgłoszenie zostało zapisane. Administratorzy i moderatorzy mogą je przejrzeć w panelu zgłoszeń.",
+        )
+        return redirect("chat:profile", user_id=user_id)
+    _flash_form_errors(request, form)
+    return redirect("chat:profile", user_id=user_id)
+
+
+@login_required
+def admin_user_reports(request):
+    """Lista zgłoszeń użytkowników — administrator lub moderator."""
+    if not _is_moderator_or_admin(request.user):
+        messages.error(request, "Brak uprawnień do przeglądania zgłoszeń.")
+        return redirect("chat:home")
+    reports = (
+        UserReport.objects.select_related("reporter", "reported_user", "reported_user__profile")
+        .order_by("-created_at")
+    )
+    all_channels = Channel.objects.filter(members__user=request.user)
+    return render(
+        request,
+        "chat/admin_user_reports.html",
+        {
+            "reports": reports,
+            "all_channels": all_channels,
+            "is_full_admin": _is_admin(request.user),
+        },
+    )
+
+
+@login_required
 def change_role(request, user_id):
     if not _is_admin(request.user):
         messages.error(request, "Brak uprawnień.")
@@ -455,7 +571,7 @@ def notifications_settings(request):
         action = (request.POST.get("action") or "").strip()
         if action == "mark_all_read":
             InAppNotification.objects.filter(
-                user=request.user, read_at__isnull=True
+                user=request.user, read_at__isnull=True, hidden=False
             ).update(read_at=timezone.now())
             purge_expired_read_inapp_notifications()
             messages.success(request, "Wszystkie powiadomienia oznaczono jako przeczytane.")
@@ -463,7 +579,7 @@ def notifications_settings(request):
 
     purge_expired_read_inapp_notifications()
     notifications = list(
-        InAppNotification.objects.filter(user=request.user)[:80]
+        InAppNotification.objects.filter(user=request.user, hidden=False)[:80]
     )
     all_channels = Channel.objects.filter(members__user=request.user)
     return render(

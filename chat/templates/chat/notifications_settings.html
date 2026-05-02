@@ -21,14 +21,13 @@
             <div class="notifications-settings-card card shadow-sm border-0 mx-auto mb-4" style="max-width: 560px;">
                 <div class="card-body p-4">
                     <p class="text-muted mb-3">
-                        Gdy ktoś napisze na <strong>innym kanale</strong> albo w <strong>innej rozmowie prywatnej</strong>,
-                        pojawi się krótkie przypomnienie u góry ekranu — i trafi tutaj na <strong>listę</strong>.
-                        Po wejściu w rozmowę powiadomienie oznaczamy jako przeczytane; po kilku godzinach znika z listy,
-                        żeby nie zaśmiecać widoku.
+                        Jeśli ktoś napisze na <strong>innym kanale</strong> albo w <strong>innej rozmowie prywatnej</strong>,
+                        zobaczysz krótkie przypomnienie u góry ekranu — i to samo pojawi się na <strong>liście poniżej</strong>.
+                        Gdy otworzysz tę rozmowę, powiadomienie przestaje być „nowe”.
                     </p>
                     <p class="text-muted small mb-4">
-                        Gdy właśnie oglądasz ten kanał lub tę rozmowę i ta karta jest aktywna, nie dostaniesz drugiego
-                        komunikatu — i tak widzisz wiadomości na bieżąco.
+                        Gdy właśnie jesteś na tym samym kanale lub w tej samej rozmowie i masz otwartą tę stronę,
+                        nie dostaniesz drugiego przypomnienia — wiadomości i tak widzisz od razu.
                     </p>
 
                     <div class="d-flex flex-wrap gap-2 mb-3">
@@ -38,7 +37,8 @@
                     </div>
 
                     <p id="notify-hint" class="small text-muted mb-0">
-                        Kliknij przycisk powyżej — pojawi się przykład takiego samego powiadomienia jak przy prawdziwej wiadomości (bez zapisu na liście).
+                        Możesz kliknąć przycisk i zobaczyć, jak wygląda takie przypomnienie. To tylko podgląd — na liście
+                        nic się nie pojawi, dopóki ktoś naprawdę do Ciebie nie napisze.
                     </p>
                 </div>
             </div>
@@ -91,7 +91,7 @@
         btn.addEventListener("click", function () {
             if (typeof window.__showAppNotificationDemo === "function") {
                 window.__showAppNotificationDemo();
-                hint.textContent = "To był tylko podgląd — prawdziwe wpisy pojawią się na liście poniżej po nowej wiadomości.";
+                hint.textContent = "To był podgląd. Gdy ktoś wyśle wiadomość, zobaczysz ją na liście poniżej.";
             } else {
                 hint.textContent = "Zaloguj się i odśwież stronę, żeby zobaczyć podgląd.";
             }

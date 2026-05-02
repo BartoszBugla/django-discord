@@ -7,10 +7,6 @@
         return window.__chatContext || ctx;
     }
 
-    function isPageFocused() {
-        return !document.hidden && document.hasFocus();
-    }
-
     function isOwnMessage(data) {
         var c = getCtx();
         return !!(data.from_username && data.from_username === c.username);
@@ -30,13 +26,12 @@
         );
     }
 
-    /** Czy użytkownik ma zobaczyć alert (inna rozmowa lub ta sama, ale karta w tle). */
+    /** Toast tylko gdy wiadomość dotyczy innego kanału / innej rozmowy (ta sama zakładka = bez popupu). */
     function shouldNotifyChannel(data) {
         if (isOwnMessage(data)) {
             return false;
         }
-        var same = isViewingChannel(data.channel_id);
-        if (same && isPageFocused()) {
+        if (isViewingChannel(data.channel_id)) {
             return false;
         }
         return true;
@@ -46,8 +41,7 @@
         if (isOwnMessage(data)) {
             return false;
         }
-        var same = isViewingDmFrom(data.from_user_id);
-        if (same && isPageFocused()) {
+        if (isViewingDmFrom(data.from_user_id)) {
             return false;
         }
         return true;
@@ -277,11 +271,11 @@
 
     connectInbox();
 
-    /** Przykładowe powiadomienie (strona „Powiadomienia w aplikacji”). */
+    /** Demo toast for the in-app notifications page. */
     window.__showAppNotificationDemo = function () {
         showInAppToast(
-            "Nowa wiadomość (przykład)",
-            "Anna: Hej, masz chwilę? Tak będzie wyglądać skrót, gdy ktoś napisze na innym kanale lub w innej rozmowie.",
+            "Nowa wiadomość — przykład",
+            "Anna: Hej, masz chwilę? Tak może wyglądać krótkie przypomnienie, gdy ktoś pisze z innego kanału albo rozmowy.",
             window.location.pathname || "/",
             null
         );

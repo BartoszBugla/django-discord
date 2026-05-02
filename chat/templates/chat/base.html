@@ -16,8 +16,10 @@
     <script>
         window.__chatContext = window.__chatContext || {
             username: "{{ user.username|escapejs }}",
+            userId: {{ user.id }},
             channelId: null,
-            dmUserId: null
+            dmUserId: null,
+            canDeleteAny: false
         };
         window.__notificationMarkReadUrl = function (id) {
             return "{% url 'chat:notification_mark_read' pk=888888888 %}".replace("888888888", String(id));

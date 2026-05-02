@@ -1,0 +1,7 @@
+https://django-discord-f2aj.onrender.com
+username: admin
+haslo: test1234
+Uwaga dotycząca wdrożenia (render.com):
+Podczas korzystania z aplikacji mogą wystąpić ostrzeżenia dotyczące certyfikatów SSL. 
+Problem ten nie został zniwelowany w kodzie, ponieważ jest to (prawdopobnie) specyfika i ograniczenie darmowej wersji środowiska render.com. 
+W środowisku produkcyjnym (na płatnym serwerze) ten problem by nie występował.

@@ -5,6 +5,21 @@ from django.contrib.auth.models import User
 from .models import Profile, Channel, Message
 
 
+class UserReportForm(forms.Form):
+    reason = forms.CharField(
+        label="Powód zgłoszenia",
+        min_length=10,
+        max_length=4000,
+        widget=forms.Textarea(
+            attrs={
+                "class": "form-control",
+                "rows": 4,
+                "placeholder": "Opisz, dlaczego zgłaszasz tego użytkownika (minimum 10 znaków)…",
+            }
+        ),
+    )
+
+
 class RegisterForm(UserCreationForm):
     email = forms.EmailField(
         required=True,

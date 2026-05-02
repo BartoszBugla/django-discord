@@ -37,7 +37,7 @@
         <div class="chat-area" id="chat-messages">
             {% for msg in wiadomosci %}
             <div class="message-item" id="message-{{ msg.id }}">
-                <div class="message-header">
+                <div class="message-header d-flex flex-wrap align-items-center gap-1">
                     <a href="{% url 'chat:profile' user_id=msg.autor.id %}"
                        class="message-author {% if msg.autor.profile.role == 'admin' %}role-admin{% elif msg.autor.profile.role == 'moderator' %}role-moderator{% endif %}">
                         {{ msg.autor.username }}
@@ -50,13 +50,9 @@
                     <span class="message-time">{{ msg.timestamp|date:"d.m.Y H:i" }}</span>
 
                     {% if request.user == msg.autor or request.user.profile.role == 'admin' or request.user.profile.role == 'moderator' or request.user.is_superuser %}
-                    <form method="post" action="{% url 'chat:delete_message' message_id=msg.id %}" class="d-inline ms-auto">
-                        {% csrf_token %}
-                        <input type="hidden" name="next" value="{% url 'chat:channel' channel_id=channel.id %}">
-                        <button type="submit" class="btn-delete-msg" title="Usuń wiadomość" onclick="return confirm('Usunąć tę wiadomość?')">
-                            <i class="bi bi-trash"></i>
-                        </button>
-                    </form>
+                    <button type="button" class="btn-delete-msg ms-auto" data-message-id="{{ msg.id }}" title="Usuń wiadomość">
+                        <i class="bi bi-trash"></i>
+                    </button>
                     {% endif %}
                 </div>
 
@@ -102,20 +98,22 @@
         </div>
 
         <div class="message-input-area">
-            <form method="post" enctype="multipart/form-data" class="d-flex gap-2 align-items-center w-100" id="message-form">
-                {% csrf_token %}
-                <input type="text" name="tresc" class="form-control" id="message-input"
-                       placeholder="Napisz wiadomość na #{{ channel.nazwa }}…" autocomplete="off">
-                <label class="btn btn-outline-secondary btn-sm" title="Dodaj obraz">
+            <div class="d-flex gap-2 align-items-center w-100 flex-wrap">
+                <form method="post" class="d-flex gap-2 align-items-center flex-grow-1" id="message-form" style="min-width: 0;">
+                    {% csrf_token %}
+                    <input type="text" name="tresc" class="form-control" id="message-input"
+                           placeholder="Napisz wiadomość na #{{ channel.nazwa }}…" autocomplete="off">
+                    <button type="submit" class="btn btn-primary btn-sm flex-shrink-0" title="Wyślij"><i class="bi bi-send"></i></button>
+                </form>
+                <label class="btn btn-outline-secondary btn-sm flex-shrink-0 mb-0" title="Dodaj obraz">
                     <i class="bi bi-image"></i>
-                    <input type="file" name="obrazek" accept="image/*" hidden onchange="this.form.submit()">
+                    <input type="file" id="channel-upload-image" accept="image/*" hidden>
                 </label>
-                <label class="btn btn-outline-secondary btn-sm" title="Dodaj nagranie audio">
+                <label class="btn btn-outline-secondary btn-sm flex-shrink-0 mb-0" title="Dodaj nagranie audio">
                     <i class="bi bi-mic"></i>
-                    <input type="file" name="audio" accept="audio/*" hidden onchange="this.form.submit()">
+                    <input type="file" id="channel-upload-audio" accept="audio/*" hidden>
                 </label>
-                <button type="submit" class="btn btn-primary btn-sm" title="Wyślij"><i class="bi bi-send"></i></button>
-            </form>
+            </div>
         </div>
     </div>
 
@@ -162,50 +160,162 @@
     window.__chatContext = window.__chatContext || {};
     window.__chatContext.channelId = {{ channel.id }};
     window.__chatContext.dmUserId = null;
+    window.__chatContext.canDeleteAny = {% if request.user.profile.role == 'admin' or request.user.profile.role == 'moderator' or request.user.is_superuser %}true{% else %}false{% endif %};
     const channelId = {{ channel.id }};
+    const channelMediaUploadUrl = "{% url 'chat:channel_media_upload' channel_id=channel.id %}";
     const wsProtocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
     const chatSocket = new WebSocket(wsProtocol + '://' + window.location.host + '/ws/chat/' + channelId + '/');
 
-    chatSocket.onmessage = function(e) {
-        const data = JSON.parse(e.data);
+    function escapeHtml(s) {
+        if (s == null || s === '') return '';
+        var d = document.createElement('div');
+        d.textContent = s;
+        return d.innerHTML;
+    }
+    function authorLinkClass(role) {
+        if (role === 'admin') return 'message-author role-admin';
+        if (role === 'moderator') return 'message-author role-moderator';
+        return 'message-author';
+    }
+    function roleTagHtml(role) {
+        if (role === 'admin') return '<span class="role-tag role-tag-admin">Administrator</span>';
+        if (role === 'moderator') return '<span class="role-tag role-tag-mod">Moderator</span>';
+        return '';
+    }
+
+    function appendChannelMessage(data) {
+        const text = (data.message != null && String(data.message).trim()) ? String(data.message) : '';
+        const img = data.image_url ? String(data.image_url) : '';
+        const aud = data.audio_url ? String(data.audio_url) : '';
+        if (!text && !img && !aud) return;
+
         const chatMessages = document.getElementById('chat-messages');
         const div = document.createElement('div');
         div.className = 'message-item';
         if (data.message_id) {
             div.id = 'message-' + data.message_id;
         }
-        div.innerHTML = '<div class="message-header"><span class="message-author">' + data.username +
-            '</span><span class="message-time">' + data.timestamp + '</span></div>' +
-            '<div class="message-text">' + data.message + '</div>';
+        const role = data.author_role || 'user';
+        const authorClass = authorLinkClass(role);
+        const tags = roleTagHtml(role);
+        const aid = data.author_id;
+        const authorInner = aid != null
+            ? '<a href="/profil/' + encodeURIComponent(String(aid)) + '/" class="' + authorClass + '">' + escapeHtml(data.username) + '</a>'
+            : '<span class="' + authorClass + '">' + escapeHtml(data.username) + '</span>';
+        const ctx = window.__chatContext || {};
+        const showDel = data.message_id != null && ((ctx.userId != null && data.author_id === ctx.userId) || ctx.canDeleteAny);
+        const delBtn = showDel
+            ? '<button type="button" class="btn-delete-msg ms-auto" data-message-id="' + encodeURIComponent(String(data.message_id)) + '" title="Usuń wiadomość"><i class="bi bi-trash"></i></button>'
+            : '';
+        const textBlock = text ? '<div class="message-text">' + escapeHtml(text) + '</div>' : '';
+        const imgBlock = img ? '<div class="mt-1"><img src="' + escapeHtml(img) + '" class="chat-image" alt="Załączony obraz"></div>' : '';
+        const audBlock = aud ? '<div class="mt-1"><audio controls src="' + escapeHtml(aud) + '"></audio></div>' : '';
+        div.innerHTML = '<div class="message-header d-flex flex-wrap align-items-center gap-1">' + authorInner + tags +
+            '<span class="message-time">' + escapeHtml(data.timestamp || '') + '</span>' + delBtn + '</div>' +
+            textBlock + imgBlock + audBlock;
         chatMessages.appendChild(div);
         chatMessages.scrollTop = chatMessages.scrollHeight;
+    }
+
+    function uploadChannelMedia(file, fieldName) {
+        if (!file) return;
+        const fd = new FormData();
+        const token = document.querySelector('#message-form input[name=csrfmiddlewaretoken]');
+        if (token) fd.append('csrfmiddlewaretoken', token.value);
+        fd.append('tresc', '');
+        fd.append(fieldName, file);
+        fetch(channelMediaUploadUrl, {
+            method: 'POST',
+            headers: { 'X-Requested-With': 'XMLHttpRequest' },
+            body: fd,
+            credentials: 'same-origin'
+        }).then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
+            .then(function (res) {
+                if (!res.ok || !res.j.ok) {
+                    const err = res.j.errors ? JSON.stringify(res.j.errors) : (res.j.error || 'Błąd wysyłania pliku');
+                    alert(err);
+                    return;
+                }
+                if (chatSocket.readyState !== WebSocket.OPEN && res.j.echo) {
+                    appendChannelMessage(res.j.echo);
+                }
+            })
+            .catch(function () { alert('Błąd sieci przy wysyłaniu pliku.'); });
+    }
+
+    chatSocket.onmessage = function(e) {
+        let data;
+        try {
+            data = JSON.parse(e.data);
+        } catch (err) {
+            return;
+        }
+        if (data.type === 'message_deleted') {
+            const gone = document.getElementById('message-' + data.message_id);
+            if (gone) gone.remove();
+            return;
+        }
+        if (data.type === 'error') {
+            if (data.code === 'forbidden') {
+                alert('Brak uprawnień do usunięcia tej wiadomości.');
+            } else if (data.code === 'not_found') {
+                alert('Wiadomość nie została znaleziona.');
+            } else if (data.code === 'bad_message_id') {
+                alert('Nieprawidłowe żądanie usunięcia.');
+            }
+            return;
+        }
+        const hasMedia = !!(data.image_url || data.audio_url);
+        const hasText = data.message != null && String(data.message).trim();
+        if (!hasMedia && !hasText) return;
+        appendChannelMessage(data);
     };
+
+    const imgIn = document.getElementById('channel-upload-image');
+    const audIn = document.getElementById('channel-upload-audio');
+    if (imgIn) {
+        imgIn.addEventListener('change', function (ev) {
+            const f = ev.target.files && ev.target.files[0];
+            ev.target.value = '';
+            if (f) uploadChannelMedia(f, 'obrazek');
+        });
+    }
+    if (audIn) {
+        audIn.addEventListener('change', function (ev) {
+            const f = ev.target.files && ev.target.files[0];
+            ev.target.value = '';
+            if (f) uploadChannelMedia(f, 'audio');
+        });
+    }
+
+    document.getElementById('chat-messages').addEventListener('click', function(ev) {
+        const btn = ev.target.closest('.btn-delete-msg');
+        if (!btn || !chatSocket || chatSocket.readyState !== WebSocket.OPEN) return;
+        ev.preventDefault();
+        if (!confirm('Usunąć tę wiadomość?')) return;
+        const mid = btn.getAttribute('data-message-id');
+        if (mid == null || mid === '') return;
+        const id = parseInt(mid, 10);
+        if (isNaN(id)) return;
+        chatSocket.send(JSON.stringify({ type: 'delete', message_id: id }));
+    });
 
     const msgForm = document.getElementById('message-form');
     const msgInput = document.getElementById('message-input');
 
     msgForm.addEventListener('submit', function(e) {
-        const fileInputs = msgForm.querySelectorAll('input[type="file"]');
-        let hasFiles = false;
-        fileInputs.forEach(function(f) { if (f.files.length > 0) hasFiles = true; });
-        if (!msgInput.value.trim() && !hasFiles) {
+        if (!msgInput.value.trim()) {
             e.preventDefault();
         }
     });
 
     msgInput.addEventListener('keypress', function(e) {
         if (e.key === 'Enter' && msgInput.value.trim() && !e.shiftKey) {
-            const fileInputs = msgForm.querySelectorAll('input[type="file"]');
-            let hasFiles = false;
-            fileInputs.forEach(f => { if (f.files.length > 0) hasFiles = true; });
-
-            if (!hasFiles) {
-                e.preventDefault();
-                const text = msgInput.value.trim();
-                if (text) {
-                    chatSocket.send(JSON.stringify({'message': text}));
-                    msgInput.value = '';
-                }
+            e.preventDefault();
+            const text = msgInput.value.trim();
+            if (text) {
+                chatSocket.send(JSON.stringify({'message': text}));
+                msgInput.value = '';
             }
         }
     });

@@ -8,6 +8,7 @@ from django.conf import settings
 from django.utils import timezone
 
 from chat.models import Channel, ChannelMember, InAppNotification
+from chat.presence_cache import is_viewing_channel, is_viewing_dm_with
 
 
 def message_push_preview(message) -> str:
@@ -27,13 +28,16 @@ def message_push_preview(message) -> str:
 
 
 def purge_expired_read_inapp_notifications():
-    """Usuwa z bazy przeczytane powiadomienia starsze niż INAPP_NOTIFICATION_READ_RETENTION_HOURS."""
+    """Usuwa przeczytane oraz ukryte (stare) powiadomienia wg INAPP_NOTIFICATION_READ_RETENTION_HOURS."""
     hours = getattr(settings, "INAPP_NOTIFICATION_READ_RETENTION_HOURS", 6)
     cutoff = timezone.now() - timedelta(hours=hours)
-    deleted_count, _ = InAppNotification.objects.filter(
+    deleted_read, _ = InAppNotification.objects.filter(
         read_at__isnull=False, read_at__lt=cutoff
     ).delete()
-    return deleted_count
+    deleted_hidden, _ = InAppNotification.objects.filter(
+        hidden=True, created_at__lt=cutoff
+    ).delete()
+    return deleted_read + deleted_hidden
 
 
 def _layer_send(group, payload):
@@ -63,6 +67,7 @@ def notify_channel_message_saved(message):
         url += f"#message-{message.id}"
 
     for uid in recipient_ids:
+        hidden = is_viewing_channel(uid, cid)
         notif = InAppNotification.objects.create(
             user_id=uid,
             kind=InAppNotification.KIND_CHANNEL,
@@ -71,7 +76,10 @@ def notify_channel_message_saved(message):
             url=url[:500],
             channel_id=cid,
             message_id=message.id,
+            hidden=hidden,
         )
+        if hidden:
+            continue
         payload = {
             "kind": "channel",
             "channel_id": cid,
@@ -95,15 +103,20 @@ def notify_dm_message_saved(message):
     if message.id:
         url += f"#message-{message.id}"
 
+    rid = message.odbiorca_id
+    hidden = is_viewing_dm_with(rid, message.autor_id)
     notif = InAppNotification.objects.create(
-        user_id=message.odbiorca_id,
+        user_id=rid,
         kind=InAppNotification.KIND_DM,
         title=title[:200],
         body=body[:2000],
         url=url[:500],
         dm_from_user_id=message.autor_id,
         message_id=message.id,
+        hidden=hidden,
     )
+    if hidden:
+        return
     payload = {
         "kind": "dm",
         "from_user_id": message.autor_id,
@@ -112,4 +125,4 @@ def notify_dm_message_saved(message):
         "message_id": message.id,
         "notification_id": notif.id,
     }
-    _layer_send(f"inbox_user_{message.odbiorca_id}", payload)
+    _layer_send(f"inbox_user_{rid}", payload)

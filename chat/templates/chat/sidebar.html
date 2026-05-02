@@ -50,6 +50,10 @@
             <i class="bi bi-shield-lock" aria-hidden="true"></i>
             <span class="sidebar-link-text">{% if request.user.is_superuser or request.user.profile.role == 'admin' %}Panel administratora{% else %}Panel moderacji{% endif %}</span>
         </a>
+        <a href="{% url 'chat:admin_user_reports' %}" class="sidebar-link">
+            <i class="bi bi-flag" aria-hidden="true"></i>
+            <span class="sidebar-link-text">Zgłoszenia użytkowników</span>
+        </a>
     </div>
     {% endif %}
 

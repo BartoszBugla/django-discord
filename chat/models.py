@@ -127,12 +127,18 @@ class InAppNotification(models.Model):
     message_id = models.PositiveIntegerField(null=True, blank=True)
     read_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
+    hidden = models.BooleanField(
+        default=False,
+        db_index=True,
+        help_text="Ukryte: użytkownik miał otwarty ten kanał / tę rozmowę — bez listy i bez pushu WS.",
+    )
 
     class Meta:
         ordering = ["-created_at"]
         indexes = [
             models.Index(fields=["user", "-created_at"]),
             models.Index(fields=["user", "read_at"]),
+            models.Index(fields=["user", "hidden"]),
         ]
 
     def __str__(self):
@@ -145,3 +151,31 @@ class InAppNotification(models.Model):
         base, sep, frag = self.url.partition("#")
         glue = "&" if "?" in base else "?"
         return f"{base}{glue}nid={self.pk}{sep}{frag}"
+
+
+class UserReport(models.Model):
+    """Zgłoszenie użytkownika do weryfikacji przez administratora."""
+
+    reporter = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name="reports_sent",
+    )
+    reported_user = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name="reports_received",
+    )
+    reason = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["-created_at"]),
+            models.Index(fields=["reported_user", "-created_at"]),
+        ]
+
+    def __str__(self):
+        when = self.created_at.strftime("%Y-%m-%d %H:%M") if self.created_at else "—"
+        return f"{self.reporter.username} → {self.reported_user.username} ({when})"

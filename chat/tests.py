@@ -9,6 +9,7 @@ from django.utils import timezone
 
 from chat.inbox_notify import message_push_preview, purge_expired_read_inapp_notifications
 from chat.models import Channel, ChannelMember, Message, InAppNotification
+from chat.presence_cache import touch_channel_view, touch_dm_view
 
 
 class RegisterViewTests(TestCase):
@@ -80,6 +81,26 @@ class InAppNotificationTests(TestCase):
         n = InAppNotification.objects.get(user=self.b)
         self.assertEqual(n.kind, InAppNotification.KIND_CHANNEL)
         self.assertIn("/kanal/", n.url)
+        self.assertFalse(n.hidden)
+
+    def test_notify_channel_hidden_when_recipient_views_channel(self):
+        from chat.inbox_notify import notify_channel_message_saved
+
+        touch_channel_view(self.b.id, self.ch.id)
+        msg = Message.objects.create(autor=self.a, channel=self.ch, tresc="hi")
+        notify_channel_message_saved(msg)
+        n = InAppNotification.objects.get(user=self.b)
+        self.assertTrue(n.hidden)
+
+    def test_notify_dm_hidden_when_recipient_views_conversation(self):
+        from chat.inbox_notify import notify_dm_message_saved
+
+        touch_dm_view(self.b.id, self.a.id)
+        msg = Message.objects.create(autor=self.a, odbiorca=self.b, tresc="dm")
+        notify_dm_message_saved(msg)
+        n = InAppNotification.objects.get(user=self.b)
+        self.assertEqual(n.kind, InAppNotification.KIND_DM)
+        self.assertTrue(n.hidden)
 
     def test_purge_removes_old_read_notifications(self):
         old = timezone.now() - timedelta(hours=24)
@@ -94,6 +115,62 @@ class InAppNotificationTests(TestCase):
         deleted_count = purge_expired_read_inapp_notifications()
         self.assertGreaterEqual(deleted_count, 1)
         self.assertEqual(InAppNotification.objects.filter(user=self.b).count(), 0)
+
+    def test_purge_removes_old_hidden_notifications(self):
+        n = InAppNotification.objects.create(
+            user=self.b,
+            kind=InAppNotification.KIND_DM,
+            title="t",
+            body="b",
+            url="/dm/1/",
+            hidden=True,
+        )
+        InAppNotification.objects.filter(pk=n.pk).update(
+            created_at=timezone.now() - timedelta(hours=24)
+        )
+        deleted_count = purge_expired_read_inapp_notifications()
+        self.assertGreaterEqual(deleted_count, 1)
+        self.assertFalse(InAppNotification.objects.filter(pk=n.pk).exists())
+
+
+class ChannelMediaUploadTests(TestCase):
+    def setUp(self):
+        self.client = Client()
+        self.u = User.objects.create_user(username="uimg", password="pw12longenough")
+        self.ch = Channel.objects.create(nazwa="ch1", opis="", tworca=self.u)
+        ChannelMember.objects.create(user=self.u, channel=self.ch)
+
+    def test_channel_media_upload_returns_echo_with_image_url(self):
+        self.client.login(username="uimg", password="pw12longenough")
+        # minimal valid GIF (1×1 px)
+        gif = (
+            b"GIF89a\x01\x00\x01\x00\x80\x00\x00\xff\xff\xff\x00\x00\x00!"
+            b"\xf9\x04\x01\x00\x00\x00\x00,\x00\x00\x00\x00\x01\x00\x01\x00\x00"
+            b"\x02\x02\x04\x01\x00;"
+        )
+        img = SimpleUploadedFile("a.gif", gif, content_type="image/gif")
+        url = reverse("chat:channel_media_upload", kwargs={"channel_id": self.ch.id})
+        r = self.client.post(
+            url,
+            {"tresc": "", "obrazek": img},
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+        self.assertEqual(r.status_code, 200)
+        data = r.json()
+        self.assertTrue(data.get("ok"))
+        self.assertIn("message_id", data)
+        self.assertIn("echo", data)
+        self.assertTrue(data["echo"].get("image_url"))
+        msg = Message.objects.get(pk=data["message_id"])
+        self.assertEqual(msg.channel_id, self.ch.id)
+
+    def test_channel_media_upload_forbidden_non_member(self):
+        outsider = User.objects.create_user(username="out", password="pw12longenough")
+        self.client.login(username="out", password="pw12longenough")
+        img = SimpleUploadedFile("a.png", b"x", content_type="image/png")
+        url = reverse("chat:channel_media_upload", kwargs={"channel_id": self.ch.id})
+        r = self.client.post(url, {"tresc": "", "obrazek": img})
+        self.assertEqual(r.status_code, 403)
 
 
 class NotificationsSettingsTests(TestCase):

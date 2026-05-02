@@ -1,0 +1,63 @@
+{% extends 'chat/base.html' %}
+{% block title %}Zgłoszenia użytkowników — Django Discord{% endblock %}
+
+{% block content %}
+<div class="app-container">
+    {% include 'chat/sidebar.html' %}
+
+    <div class="main-content">
+        <div class="top-bar d-flex flex-wrap align-items-center justify-content-between gap-2">
+            <h5 class="mb-0"><i class="bi bi-flag"></i> Zgłoszenia użytkowników</h5>
+            <a href="{% url 'chat:admin_users' %}" class="btn btn-sm btn-outline-secondary">
+                <i class="bi bi-shield-lock"></i> {% if is_full_admin %}Panel administratora{% else %}Panel moderacji{% endif %}
+            </a>
+        </div>
+
+        <div class="content-area p-4">
+            {% if messages %}
+            {% for msg in messages %}
+            <div class="alert alert-{% if msg.tags == 'error' %}danger{% elif msg.tags == 'success' %}success{% else %}info{% endif %}">{{ msg }}</div>
+            {% endfor %}
+            {% endif %}
+
+            <p class="text-muted">
+                Poniżej wszystkie zgłoszenia w kolejności od najnowszych. W kolumnie „Powód” znajduje się treść przekazana przez zgłaszającego. Widok jest dostępny dla administratorów i moderatorów.
+            </p>
+
+            {% if reports %}
+            <div class="table-responsive">
+                <table class="table table-hover align-middle">
+                    <thead>
+                        <tr>
+                            <th scope="col">Data</th>
+                            <th scope="col">Zgłaszający</th>
+                            <th scope="col">Zgłoszony</th>
+                            <th scope="col">Powód zgłoszenia</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for r in reports %}
+                        <tr>
+                            <td class="text-nowrap small">{{ r.created_at|date:"d.m.Y H:i" }}</td>
+                            <td>
+                                <a href="{% url 'chat:profile' user_id=r.reporter_id %}">{{ r.reporter.username }}</a>
+                            </td>
+                            <td>
+                                <a href="{% url 'chat:profile' user_id=r.reported_user_id %}">{{ r.reported_user.username }}</a>
+                                <span class="badge bg-{% if r.reported_user.profile.role == 'admin' %}danger{% elif r.reported_user.profile.role == 'moderator' %}warning{% else %}secondary{% endif %} ms-1">
+                                    {{ r.reported_user.profile.get_role_display }}
+                                </span>
+                            </td>
+                            <td class="small text-break" style="max-width: 28rem;">{{ r.reason|linebreaksbr }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <p class="text-muted mb-0">Brak zgłoszeń.</p>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}
